@@ -1,3 +1,4 @@
+
 import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue } from '@/types';
 import { NUMBER_OF_MEMBERS, LOCATION_IDS } from './constants';
 import {
@@ -20,7 +21,7 @@ export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   return {
     date: entry.date,
     total,
-    memberShare: total / NUMBER_OF_MEMBERS,
+    memberShare: total > 0 && NUMBER_OF_MEMBERS > 0 ? total / NUMBER_OF_MEMBERS : 0,
     locationTotals: entry.revenues,
   };
 }
@@ -60,6 +61,7 @@ export function getWeeklyTotals(entries: RevenueEntry[], date: Date = new Date()
   return Object.entries(weeklyAggregations).map(([weekStart, data]) => ({
     period: `Semana del ${format(parseISO(weekStart), 'PPP', { locale: es })}`,
     total: data.total,
+    memberShare: data.total > 0 && NUMBER_OF_MEMBERS > 0 ? data.total / NUMBER_OF_MEMBERS : 0,
     entries: data.entries,
   })).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
@@ -83,6 +85,7 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   return Object.entries(monthlyAggregations).map(([monthStart, data]) => ({
     period: format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es }), // Add day for parsing
     total: data.total,
+    memberShare: data.total > 0 && NUMBER_OF_MEMBERS > 0 ? data.total / NUMBER_OF_MEMBERS : 0,
     entries: data.entries,
   })).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }

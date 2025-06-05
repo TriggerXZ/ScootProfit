@@ -1,3 +1,4 @@
+
 export interface LocationRevenueInput {
   la72: string; // Input as string for form handling
   elCubo: string;
@@ -28,5 +29,6 @@ export interface DailyTotal {
 export interface AggregatedTotal {
   period: string; // e.g., "Week of YYYY-MM-DD", "Month of YYYY-MM"
   total: number;
+  memberShare: number;
   entries: RevenueEntry[];
 }

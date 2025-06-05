@@ -8,7 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { LOCATIONS, LOCATION_IDS } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin } from 'lucide-react';
+import { CalendarDays, MapPin, Users } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -59,13 +59,19 @@ export function AggregatedSummarySection({ title, totals, isLoading }: Aggregate
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
-                <AccordionTrigger className="hover:no-underline">
+                <AccordionTrigger className="hover:no-underline py-4">
                   <div className="flex justify-between items-center w-full pr-4">
                     <span className="text-lg font-medium flex items-center">
                       <CalendarDays className="mr-2 h-5 w-5 text-primary" />
                       {item.period}
                     </span>
-                    <span className="text-xl font-semibold text-accent">{formatCurrencyCOP(item.total)}</span>
+                    <div className="text-right">
+                      <div className="text-xl font-semibold text-accent">{formatCurrencyCOP(item.total)}</div>
+                      <div className="text-xs text-muted-foreground flex items-center justify-end gap-1 mt-1">
+                        <Users className="h-3 w-3" />
+                        <span>Cuota Miembro: {formatCurrencyCOP(item.memberShare)}</span>
+                      </div>
+                    </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-2 pb-4 px-2 space-y-3 bg-muted/30 rounded-md">
