@@ -7,7 +7,7 @@ import { AggregatedSummarySection } from '@/components/sections/AggregatedSummar
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
-import html2pdf from 'html2pdf.js';
+// Removed static import: import html2pdf from 'html2pdf.js';
 
 export default function ReportsPage() {
   const { allWeeklyTotals, allMonthlyTotals, isLoading } = useRevenueEntries();
@@ -15,7 +15,9 @@ export default function ReportsPage() {
   const weeklyReportRef = useRef<HTMLDivElement>(null);
   const monthlyReportRef = useRef<HTMLDivElement>(null);
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
+    const html2pdf = (await import('html2pdf.js')).default; // Dynamically import
+
     const elementToPrint = activeTab === 'weekly' ? weeklyReportRef.current : monthlyReportRef.current;
     const reportTitle = activeTab === 'weekly' ? 'Reporte Semanal de Ingresos' : 'Reporte Mensual de Ingresos';
     const filename = activeTab === 'weekly' ? 'reporte_semanal_scootprofit.pdf' : 'reporte_mensual_scootprofit.pdf';
