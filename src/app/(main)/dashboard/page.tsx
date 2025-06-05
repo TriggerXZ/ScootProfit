@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { StatCard } from '@/components/cards/StatCard.tsx';
+import { StatCard } from '@/components/cards/StatCard';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { calculateDailyTotal } from '@/lib/calculations';
@@ -29,22 +29,27 @@ export default function DashboardPage() {
   }, [selectedDate, getDailySummary, entries]);
 
   useEffect(() => {
-    refreshEntries(); // Ensure data is fresh on mount/focus if necessary
+    refreshEntries(); 
   }, [refreshEntries]);
 
   const currentMonthTotal = React.useMemo(() => {
     const currentMonthStr = format(new Date(), 'MMMM yyyy', { locale: es });
     const monthData = allMonthlyTotals().find(m => m.period === currentMonthStr);
     return monthData ? monthData.total : 0;
-  }, [allMonthlyTotals, entries]);
+  }, [allMonthlyTotals]); // Removed entries from dependency array as allMonthlyTotals already depends on it
 
   const averageDailyRevenue = React.useMemo(() => {
     if (entries.length === 0) return 0;
-    const totalRevenue = entries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
-    // Handle division by zero if entries becomes empty during calculation
-    const uniqueDates = new Set(entries.map(entry => entry.date));
-    return uniqueDates.size > 0 ? totalRevenue / uniqueDates.size : 0;
+    const dailyTotals = new Map<string, number>();
+    entries.forEach(entry => {
+      const dailyTotal = calculateDailyTotal(entry).total;
+      dailyTotals.set(entry.date, (dailyTotals.get(entry.date) || 0) + dailyTotal);
+    });
+    if (dailyTotals.size === 0) return 0;
+    const totalRevenue = Array.from(dailyTotals.values()).reduce((sum, total) => sum + total, 0);
+    return totalRevenue / dailyTotals.size;
   }, [entries]);
+
 
   if (isLoading) {
     return (
@@ -112,7 +117,7 @@ export default function DashboardPage() {
                 <div key={locId} className="flex items-center justify-between p-3 bg-card rounded-lg border">
                   <div className="flex items-center gap-2">
                     <MapPin className="h-5 w-5 text-primary" />
-                    <span className="font-medium">{LOCATIONS[locId.toUpperCase() as keyof typeof LOCATIONS].name}</span>
+                    <span className="font-medium">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
                   </div>
                   <span className="font-semibold text-lg">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
                 </div>

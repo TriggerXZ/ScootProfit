@@ -15,6 +15,7 @@ import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrencyCOP, getCurrentDateString } from '@/lib/formatters';
 import { parseISO, format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const revenueSchema = z.string().refine(val => !isNaN(parseFloat(val.replace(/\./g, ''))) && parseFloat(val.replace(/\./g, '')) >= 0, {
   message: "Debe ser un número positivo"
@@ -31,7 +32,7 @@ const formSchema = z.object({
 type RevenueFormValues = z.infer<typeof formSchema>;
 
 interface RevenueEntryFormProps {
-  onSubmitSuccess: () => void;
+  onSubmitSuccess: (date: string, revenues: LocationRevenueInput) => void; // Updated signature
   getExistingEntry: (date: string) => RevenueEntry | undefined;
 }
 
@@ -57,7 +58,10 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
       const existingEntry = getExistingEntry(dateString);
       if (existingEntry) {
         LOCATION_IDS.forEach(locId => {
-          setValue(locId, existingEntry.revenues[locId]?.toString() || "0");
+          // Format to string with thousand separators for display
+          const revenueValue = existingEntry.revenues[locId]?.toString() || "0";
+          const formattedValue = parseInt(revenueValue, 10).toLocaleString('es-CO');
+          setValue(locId, formattedValue === 'NaN' ? '0' : formattedValue);
         });
       } else {
         LOCATION_IDS.forEach(locId => {
@@ -77,28 +81,33 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
       la78: data.la78.replace(/\./g, ''),
     };
     
-    // Call parent onSubmit, which will then use useRevenueEntries hook
-    // This component itself doesn't call addEntry directly from the hook
-    // to allow for more flexibility if used in different contexts.
-    // Here, we'll assume onSubmitSuccess handles the data saving via the hook.
     onSubmitSuccess(dateString, revenues);
 
 
     toast({
       title: "Ingreso Guardado",
-      description: `Los ingresos para ${format(data.date, 'PPP', { locale: require('date-fns/locale/es').default })} han sido guardados.`,
+      description: `Los ingresos para ${format(data.date, 'PPP', { locale: es })} han sido guardados.`,
     });
     // reset(); // Optionally reset form, or keep values for quick edits
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, fieldName: LocationId) => {
     const rawValue = event.target.value;
-    // Remove non-digit characters except for a potential decimal separator
     const numericValue = rawValue.replace(/[^0-9]/g, '');
-    // Format with dots for thousands
-    const formattedValue = parseInt(numericValue, 10).toLocaleString('es-CO');
     
-    setValue(fieldName, numericValue === '' ? '0' : formattedValue === 'NaN' ? '0' : formattedValue);
+    if (numericValue === '') {
+      setValue(fieldName, '0');
+      return;
+    }
+    
+    const parsedNum = parseInt(numericValue, 10);
+    if (isNaN(parsedNum)) {
+      setValue(fieldName, '0');
+      return;
+    }
+    
+    const formattedValue = parsedNum.toLocaleString('es-CO');
+    setValue(fieldName, formattedValue);
   };
 
 
@@ -131,7 +140,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
 
           {LOCATION_IDS.map(locId => (
             <div key={locId} className="space-y-2">
-              <Label htmlFor={locId} className="capitalize">{LOCATIONS[locId.toUpperCase() as keyof typeof LOCATIONS]?.name || locId}</Label>
+              <Label htmlFor={locId} className="capitalize">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</Label>
               <Controller
                 name={locId as LocationId}
                 control={control}
@@ -139,10 +148,27 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
                   <Input
                     {...field}
                     id={locId}
-                    type="text" // Use text to allow formatted input
-                    placeholder={`Ingresos para ${LOCATIONS[locId.toUpperCase() as keyof typeof LOCATIONS]?.name || locId}`}
-                    onChange={(e) => handleInputChange(e, locId as LocationId)}
-                    value={field.value === "0" ? "" : field.value}
+                    type="text" 
+                    placeholder={`Ingresos para ${(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}`}
+                    onChange={(e) => {
+                      handleInputChange(e, locId as LocationId);
+                      field.onChange(e.target.value.replace(/\./g, '')); // Store raw number for validation
+                    }}
+                    onBlur={(e) => { // Re-format on blur for display
+                        const rawValue = e.target.value;
+                        const numericValue = rawValue.replace(/[^0-9]/g, '');
+                        if (numericValue === '') {
+                            setValue(locId, '0');
+                        } else {
+                            const parsedNum = parseInt(numericValue, 10);
+                            if (!isNaN(parsedNum)) {
+                                setValue(locId, parsedNum.toLocaleString('es-CO'));
+                            } else {
+                                setValue(locId, '0');
+                            }
+                        }
+                    }}
+                    value={field.value === "0" ? "" : (parseInt(field.value.replace(/\./g, ''),10) || 0).toLocaleString('es-CO')}
                     className="text-lg"
                   />
                 )}

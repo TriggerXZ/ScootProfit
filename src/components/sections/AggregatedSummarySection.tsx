@@ -75,7 +75,7 @@ export function AggregatedSummarySection({ title, totals, isLoading }: Aggregate
                       <div key={locId} className="flex items-center justify-between p-2 bg-card rounded-md border">
                          <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">{LOCATIONS[locId.toUpperCase() as keyof typeof LOCATIONS].name}</span>
+                            <span className="text-sm font-medium">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
                           </div>
                         <span className="font-medium text-sm">{formatCurrencyCOP(locationTotalsInPeriod[locId])}</span>
                       </div>
