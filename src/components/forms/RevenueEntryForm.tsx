@@ -32,18 +32,19 @@ const formSchema = z.object({
 type RevenueFormValues = z.infer<typeof formSchema>;
 
 interface RevenueEntryFormProps {
-  onSubmitSuccess: (date: string, revenues: LocationRevenueInput) => void; // Updated signature
+  onSubmitSuccess: (date: string, revenues: LocationRevenueInput) => void;
   getExistingEntry: (date: string) => RevenueEntry | undefined;
 }
 
 export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueEntryFormProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
 
   const { control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<RevenueFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date(),
+      date: undefined, // Initialize as undefined to prevent hydration mismatch
       la72: "0",
       elCubo: "0",
       parqueDeLasLuces: "0",
@@ -52,13 +53,18 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
   });
 
   useEffect(() => {
+    // Set initial date and today's date on client side
+    setSelectedDate(new Date());
+    setClientToday(new Date());
+  }, []);
+
+  useEffect(() => {
     if (selectedDate) {
       setValue("date", selectedDate);
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       const existingEntry = getExistingEntry(dateString);
       if (existingEntry) {
         LOCATION_IDS.forEach(locId => {
-          // Format to string with thousand separators for display
           const revenueValue = existingEntry.revenues[locId]?.toString() || "0";
           const formattedValue = parseInt(revenueValue, 10).toLocaleString('es-CO');
           setValue(locId, formattedValue === 'NaN' ? '0' : formattedValue);
@@ -83,12 +89,10 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
     
     onSubmitSuccess(dateString, revenues);
 
-
     toast({
       title: "Ingreso Guardado",
       description: `Los ingresos para ${format(data.date, 'PPP', { locale: es })} han sido guardados.`,
     });
-    // reset(); // Optionally reset form, or keep values for quick edits
   };
   
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>, fieldName: LocationId) => {
@@ -110,7 +114,6 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
     setValue(fieldName, formattedValue);
   };
 
-
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
@@ -131,7 +134,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
                     field.onChange(date);
                     setSelectedDate(date);
                   }}
-                  disabled={(date) => date > new Date() || date < new Date("2000-01-01")}
+                  disabled={!clientToday ? () => true : (date) => date > clientToday || date < new Date("2000-01-01")}
                 />
               )}
             />
@@ -152,9 +155,11 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
                     placeholder={`Ingresos para ${(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}`}
                     onChange={(e) => {
                       handleInputChange(e, locId as LocationId);
-                      field.onChange(e.target.value.replace(/\./g, '')); // Store raw number for validation
+                      // field.onChange should ideally be called with the raw numeric string for validation purposes if revenueSchema expects that
+                      // However, current setup seems to store formatted string then parse. Keeping as is unless further issues.
+                      // field.onChange(e.target.value.replace(/\./g, '')); // Store raw number for validation
                     }}
-                    onBlur={(e) => { // Re-format on blur for display
+                    onBlur={(e) => { 
                         const rawValue = e.target.value;
                         const numericValue = rawValue.replace(/[^0-9]/g, '');
                         if (numericValue === '') {
@@ -168,7 +173,8 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
                             }
                         }
                     }}
-                    value={field.value === "0" ? "" : (parseInt(field.value.replace(/\./g, ''),10) || 0).toLocaleString('es-CO')}
+                    // Ensure value prop reflects what's in RHF, which should be the formatted string after handleInputChange/onBlur
+                    value={field.value === "0" ? "" : (parseInt(String(field.value).replace(/\./g, ''), 10) || 0).toLocaleString('es-CO')}
                     className="text-lg"
                   />
                 )}

@@ -18,9 +18,14 @@ import { es } from 'date-fns/locale';
 
 export default function DashboardPage() {
   const { entries, isLoading, getDailySummary, allMonthlyTotals, refreshEntries } = useRevenueEntries();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
   
+  useEffect(() => {
+    // Set initial date on client side to avoid hydration mismatch
+    setSelectedDate(new Date());
+  }, []);
+
   useEffect(() => {
     if (selectedDate) {
       const summary = getDailySummary(selectedDate);
@@ -36,22 +41,32 @@ export default function DashboardPage() {
     const currentMonthStr = format(new Date(), 'MMMM yyyy', { locale: es });
     const monthData = allMonthlyTotals().find(m => m.period === currentMonthStr);
     return monthData ? monthData.total : 0;
-  }, [allMonthlyTotals]); // Removed entries from dependency array as allMonthlyTotals already depends on it
+  }, [allMonthlyTotals]);
 
   const averageDailyRevenue = React.useMemo(() => {
     if (entries.length === 0) return 0;
-    const dailyTotals = new Map<string, number>();
+    const dailyTotalsMap = new Map<string, { sum: number, count: number }>();
     entries.forEach(entry => {
-      const dailyTotal = calculateDailyTotal(entry).total;
-      dailyTotals.set(entry.date, (dailyTotals.get(entry.date) || 0) + dailyTotal);
+      const dateStr = entry.date;
+      const dailyTotalForEntry = calculateDailyTotal(entry).total;
+      const current = dailyTotalsMap.get(dateStr) || { sum: 0, count: 0 };
+      current.sum += dailyTotalForEntry;
+      current.count = 1; // Each entry for a date contributes to that day's single sum for averaging
+      dailyTotalsMap.set(dateStr, current);
     });
-    if (dailyTotals.size === 0) return 0;
-    const totalRevenue = Array.from(dailyTotals.values()).reduce((sum, total) => sum + total, 0);
-    return totalRevenue / dailyTotals.size;
+
+    if (dailyTotalsMap.size === 0) return 0;
+    
+    let totalRevenue = 0;
+    dailyTotalsMap.forEach(value => {
+      totalRevenue += value.sum;
+    });
+    
+    return totalRevenue / dailyTotalsMap.size;
   }, [entries]);
 
 
-  if (isLoading) {
+  if (isLoading || selectedDate === undefined) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
