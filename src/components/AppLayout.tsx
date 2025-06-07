@@ -9,7 +9,7 @@ import { Sun, Moon, Coins } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
 
   return (
     <SidebarProvider defaultOpen>
@@ -33,7 +33,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
             aria-label="Toggle theme"
           >
             <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
