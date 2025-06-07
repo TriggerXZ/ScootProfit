@@ -5,31 +5,11 @@ import React from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { SidebarNav } from './SidebarNav';
 import { Button } from '@/components/ui/button';
-import { Sun, Moon, Coins } from 'lucide-react'; // Using Coins for ScootProfit
-import { useTheme } from 'next-themes'; // Assuming next-themes is installed or will be added
-
-// Mock useTheme if not available
-const useThemeFallback = () => {
-  const [theme, setThemeState] = React.useState('light');
-  const toggleTheme = () => setThemeState(prev => (prev === 'light' ? 'dark' : 'light'));
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.documentElement.classList.toggle('dark', theme === 'dark');
-    }
-  }, [theme]);
-  return { theme, setTheme: toggleTheme };
-};
-
-let actualUseTheme: any;
-try {
-  actualUseTheme = require('next-themes').useTheme;
-} catch (e) {
-  actualUseTheme = useThemeFallback;
-}
-
+import { Sun, Moon, Coins } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
-  const { theme, setTheme } = actualUseTheme();
+  const { theme, setTheme } = useTheme();
 
   return (
     <SidebarProvider defaultOpen>
