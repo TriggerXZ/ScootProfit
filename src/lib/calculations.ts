@@ -1,6 +1,6 @@
 
 import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue } from '@/types';
-import { NUMBER_OF_MEMBERS, LOCATION_IDS } from './constants';
+import { NUMBER_OF_MEMBERS, LOCATION_IDS, LocationId } from './constants';
 import {
   startOfWeek,
   endOfWeek,
@@ -43,27 +43,32 @@ export function getEntriesForDate(entries: RevenueEntry[], date: Date): RevenueE
 }
 
 export function getWeeklyTotals(entries: RevenueEntry[], date: Date = new Date()): AggregatedTotal[] {
-  const weeklyAggregations: { [weekStart: string]: { total: number, entries: RevenueEntry[] } } = {};
+  const weeklyAggregations: { [weekStart: string]: { total: number, memberShare: number, entries: RevenueEntry[] } } = {};
 
   entries.forEach(entry => {
     const entryDate = parseISO(entry.date);
-    const weekStartDate = startOfWeek(entryDate, { locale: es });
+    // Adjust week to start on Tuesday (0=Sun, 1=Mon, 2=Tue)
+    const weekStartDate = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 });
     const weekStartString = format(weekStartDate, 'yyyy-MM-dd');
 
     if (!weeklyAggregations[weekStartString]) {
-      weeklyAggregations[weekStartString] = { total: 0, entries: [] };
+      weeklyAggregations[weekStartString] = { total: 0, memberShare: 0, entries: [] };
     }
     const dailySum = calculateDailyTotal(entry).total;
     weeklyAggregations[weekStartString].total += dailySum;
     weeklyAggregations[weekStartString].entries.push(entry);
   });
   
-  return Object.entries(weeklyAggregations).map(([weekStart, data]) => ({
-    period: `Semana del ${format(parseISO(weekStart), 'PPP', { locale: es })}`,
-    total: data.total,
-    memberShare: data.total > 0 && NUMBER_OF_MEMBERS > 0 ? data.total / NUMBER_OF_MEMBERS : 0,
-    entries: data.entries,
-  })).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
+  return Object.entries(weeklyAggregations).map(([weekStart, data]) => {
+    const totalForPeriod = data.total;
+    const memberShareForPeriod = totalForPeriod > 0 && NUMBER_OF_MEMBERS > 0 ? totalForPeriod / NUMBER_OF_MEMBERS : 0;
+    return {
+      period: `Semana del ${format(parseISO(weekStart), 'PPP', { locale: es })}`,
+      total: totalForPeriod,
+      memberShare: memberShareForPeriod,
+      entries: data.entries,
+    };
+  }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
 export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
@@ -82,23 +87,22 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     monthlyAggregations[monthStartString].entries.push(entry);
   });
 
-  return Object.entries(monthlyAggregations).map(([monthStart, data]) => ({
-    period: format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es }), // Add day for parsing
-    total: data.total,
-    memberShare: data.total > 0 && NUMBER_OF_MEMBERS > 0 ? data.total / NUMBER_OF_MEMBERS : 0,
-    entries: data.entries,
-  })).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
+  return Object.entries(monthlyAggregations).map(([monthStart, data]) => {
+    const totalForPeriod = data.total;
+    const memberShareForPeriod = totalForPeriod > 0 && NUMBER_OF_MEMBERS > 0 ? totalForPeriod / NUMBER_OF_MEMBERS : 0;
+    return {
+      period: format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es }), // Add day for parsing
+      total: totalForPeriod,
+      memberShare: memberShareForPeriod,
+      entries: data.entries,
+    };
+  }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
   const monthlyTotals = getMonthlyTotals(entries); // This already aggregates
-  // Sort by period to ensure chronological order for the AI
-  // The period string is "Month Year", so we need to parse it back to sort if not already sorted.
-  // getMonthlyTotals already sorts descending by date, so we might need to reverse for chronological.
   
-  // Let's ensure the AI gets data in chronological order (oldest to newest)
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
-    // Find the earliest date in each entry list to represent the month's actual timing
     const dateA = a.entries.length > 0 ? parseISO(a.entries.reduce((min, p) => (p.date < min ? p.date : min), a.entries[0].date)) : new Date(0);
     const dateB = b.entries.length > 0 ? parseISO(b.entries.reduce((min, p) => (p.date < min ? p.date : min), b.entries[0].date)) : new Date(0);
     return dateA.getTime() - dateB.getTime();
