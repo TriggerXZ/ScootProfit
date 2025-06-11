@@ -66,8 +66,6 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
         <Accordion type="single" collapsible className="w-full">
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
-            // Deductions are applied (and detailed) if totalDeductions > 0.
-            // This happens for monthly reports and the first week of the month for weekly reports.
             const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
 
             return (
@@ -99,19 +97,19 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <>
                         <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">(-) Costos Operativos del Negocio:</div>
                         
-                        <div className="text-muted-foreground pl-4">Zona Segura:</div>
+                        <div className="text-muted-foreground pl-4">Zona Segura (Total Negocio):</div>
                         <div className="md:text-right text-muted-foreground">
                           {formatCurrencyCOP(item.deductionsDetail.zonaSegura)}
                           <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_ZONA_SEGURA_PER_MEMBER)} / miembro)</span>
                         </div>
                         
-                        <div className="text-muted-foreground pl-4">Arriendo:</div>
+                        <div className="text-muted-foreground pl-4">Arriendo (Total Negocio):</div>
                         <div className="md:text-right text-muted-foreground">
                           {formatCurrencyCOP(item.deductionsDetail.arriendo)}
                           <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_ARRIENDO_PER_MEMBER)} / miembro)</span>
                         </div>
 
-                        <div className="text-muted-foreground pl-4">Aporte Cooperativa:</div>
+                        <div className="text-muted-foreground pl-4">Aporte Cooperativa (Total Negocio):</div>
                         <div className="md:text-right text-muted-foreground">
                           {formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}
                           <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER)} / miembro)</span>
@@ -135,19 +133,29 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         </div>
                       </>
                     )}
+                    {!showDeductionsDetails && ( // Display this when no deductions are applied (e.g., non-first weeks)
+                        <>
+                          <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">Costos Operativos del Negocio:</div>
+                          <div className="col-span-1 md:col-span-2 text-muted-foreground text-center py-2">
+                            No se aplican costos operativos detallados para este período semanal.
+                          </div>
+                           <div className="font-bold text-lg text-foreground mt-2">Cuota Neta Final por Miembro:</div>
+                           <div className={`md:text-right font-bold text-lg mt-2 text-accent`}>
+                             {formatCurrencyCOP(item.netMemberShare)}
+                           </div>
+                        </>
+                    )}
                   </div>
 
-                  {showDeductionsDetails && ( // Only show invoice button if deductions are detailed
-                    <Button 
-                      onClick={() => onDownloadInvoice(item)} 
-                      variant="outline" 
-                      size="sm"
-                      className="mt-4 w-full md:w-auto"
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      Descargar Liquidación PDF
-                    </Button>
-                  )}
+                  <Button 
+                    onClick={() => onDownloadInvoice(item)} 
+                    variant="outline" 
+                    size="sm"
+                    className="mt-4 w-full md:w-auto"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    Descargar Liquidación PDF
+                  </Button>
                   
                   <h4 className="text-md font-semibold pt-3 border-t border-border mt-4 text-foreground">Detalle por Punto de Venta (Ingresos Brutos):</h4>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -179,5 +187,6 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
     </Card>
   );
 }
+    
 
     

@@ -74,13 +74,14 @@ export default function ReportsPage() {
       titleElement.style.textAlign = 'center';
       titleElement.style.marginBottom = '10px'; 
       titleElement.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-headline') || 'Poppins, sans-serif'; 
-      titleElement.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || '#2c3e50';
+      const defaultTextColor = '#2c3e50'; // Dark gray as a fallback
+      titleElement.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || defaultTextColor;
 
       const container = document.createElement('div');
       container.style.width = '190mm'; 
       container.style.margin = '0 auto';
       container.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'PT Sans, sans-serif';
-      container.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim();
+      container.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || defaultTextColor;
       container.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
       container.style.lineHeight = '1.5';
       container.style.fontSize = '10pt'; 
@@ -108,73 +109,74 @@ export default function ReportsPage() {
     const html2pdf = (await import('html2pdf.js')).default;
     const { es: localeEs } = await import('date-fns/locale/es');
     const currentDate = format(new Date(), 'PPP', { locale: localeEs });
+    const textColor = '#2c3e50'; // Explicit dark color for all text
 
     const invoiceHTML = `
-      <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5;">
-        <h1 style="text-align: center; color: #333; font-size: 18px; margin-bottom: 10px;">Liquidación de Ingresos para Miembro</h1>
+      <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5; color: ${textColor};">
+        <h1 style="text-align: center; color: ${textColor}; font-size: 18px; margin-bottom: 10px;">Liquidación de Ingresos para Miembro</h1>
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="font-size: 16px; margin: 0;">ScootProfit</h2>
+          <h2 style="font-size: 16px; margin: 0; color: ${textColor};">ScootProfit</h2>
         </div>
-        <table style="width: 100%; margin-bottom: 20px; font-size: 10pt;">
+        <table style="width: 100%; margin-bottom: 20px; font-size: 10pt; color: ${textColor};">
           <tr>
-            <td style="font-weight: bold; padding: 4px;">Fecha de Emisión:</td>
-            <td style="padding: 4px;">${currentDate}</td>
+            <td style="font-weight: bold; padding: 4px; color: ${textColor};">Fecha de Emisión:</td>
+            <td style="padding: 4px; color: ${textColor};">${currentDate}</td>
           </tr>
           <tr>
-            <td style="font-weight: bold; padding: 4px;">Período de Liquidación:</td>
-            <td style="padding: 4px;">${item.period}</td>
+            <td style="font-weight: bold; padding: 4px; color: ${textColor};">Período de Liquidación:</td>
+            <td style="padding: 4px; color: ${textColor};">${item.period}</td>
           </tr>
         </table>
         
-        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom:10px; font-size: 14px; color: #555;">Detalle de Liquidación</h3>
+        <h3 style="border-bottom: 2px solid #eee; padding-bottom: 5px; margin-top: 20px; margin-bottom:10px; font-size: 14px; color: ${textColor};">Detalle de Liquidación</h3>
         
-        <table style="width: 100%; border-collapse: collapse; font-size: 10pt;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 10pt; color: ${textColor};">
           <thead>
             <tr>
-              <th style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; background-color: #f0f0f0;">Concepto</th>
-              <th style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; background-color: #f0f0f0;">Valor (COP)</th>
+              <th style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; background-color: #f0f0f0; color: ${textColor};">Concepto</th>
+              <th style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; background-color: #f0f0f0; color: ${textColor};">Valor (COP)</th>
             </tr>
           </thead>
           <tbody>
             <tr style="background-color: #f9f9f9;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd;">1. Total Ingresos Brutos del Período (Todos los puntos):</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatCurrencyCOP(item.totalRevenueInPeriod)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">1. Total Ingresos Brutos del Período (Todos los puntos):</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${formatCurrencyCOP(item.totalRevenueInPeriod)}</td>
             </tr>
             <tr>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;" colspan="2">2. Costos Operativos Fijos del Período:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; color: ${textColor};" colspan="2">2. Costos Operativos Fijos del Período:</td>
             </tr>
             <tr style="background-color: #fdfdfd;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left;">&nbsp;&nbsp;&nbsp;&nbsp;Pago Zona Segura:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; color: ${textColor};">&nbsp;&nbsp;&nbsp;&nbsp;Pago Zona Segura:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</td>
             </tr>
             <tr style="background-color: #fdfdfd;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left;">&nbsp;&nbsp;&nbsp;&nbsp;Arriendo:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatCurrencyCOP(item.deductionsDetail.arriendo)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; color: ${textColor};">&nbsp;&nbsp;&nbsp;&nbsp;Arriendo:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${formatCurrencyCOP(item.deductionsDetail.arriendo)}</td>
             </tr>
             <tr style="background-color: #fdfdfd;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left;">&nbsp;&nbsp;&nbsp;&nbsp;Aporte Cooperativa:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: left; color: ${textColor};">&nbsp;&nbsp;&nbsp;&nbsp;Aporte Cooperativa:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">3. Total Costos Operativos Fijos (Sumatoria de 2):</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${formatCurrencyCOP(item.deductionsDetail.totalDeductions)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; color: ${textColor};">3. Total Costos Operativos Fijos (Sumatoria de 2):</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: ${textColor};">${formatCurrencyCOP(item.deductionsDetail.totalDeductions)}</td>
             </tr>
             <tr>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold;">4. Ingreso Neto del Período para Distribución (1 - 3):</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${formatCurrencyCOP(item.netRevenueToDistribute)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; color: ${textColor};">4. Ingreso Neto del Período para Distribución (1 - 3):</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: ${item.netRevenueToDistribute < 0 ? '#dc3545' : textColor};">${formatCurrencyCOP(item.netRevenueToDistribute)}</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd;">5. Número de Miembros Participantes:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${NUMBER_OF_MEMBERS}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">5. Número de Miembros Participantes:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${NUMBER_OF_MEMBERS}</td>
             </tr>
             <tr>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt;">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netRevenueToDistribute >= 0 ? (item.netMemberShare > 0 ? '#28a745' : '#555') : '#dc3545'};">${formatCurrencyCOP(item.netMemberShare)}</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netRevenueToDistribute >= 0 ? (item.netMemberShare > 0 ? '#28a745' : textColor) : '#dc3545'};">${formatCurrencyCOP(item.netMemberShare)}</td>
             </tr>
           </tbody>
         </table>
-        ${item.netRevenueToDistribute < 0 ? '<p style="color: red; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: El ingreso neto a distribuir es negativo, lo que indica que los costos operativos superaron los ingresos del período.</p>' : ''}
-        ${item.netRevenueToDistribute >= 0 && item.netMemberShare <= 0 && item.totalRevenueInPeriod > item.deductionsDetail.totalDeductions ? '<p style="color: orange; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: Aunque hubo un ingreso neto positivo para distribuir, la cuota individual por miembro es cero o negativa debido al redondeo o un alto número de miembros.</p>' : ''}
+        ${item.netRevenueToDistribute < 0 ? `<p style="color: red; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: El ingreso neto a distribuir es negativo, lo que indica que los costos operativos superaron los ingresos del período.</p>` : ''}
+        ${item.netRevenueToDistribute >= 0 && item.netMemberShare <= 0 && item.totalRevenueInPeriod > item.deductionsDetail.totalDeductions ? `<p style="color: orange; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: Aunque hubo un ingreso neto positivo para distribuir, la cuota individual por miembro es cero o negativa debido al redondeo o un alto número de miembros.</p>` : ''}
         <p style="text-align: center; margin-top: 25px; font-size: 9pt; color: #777;">Este es un documento generado automáticamente.</p>
       </div>
     `;
@@ -236,3 +238,5 @@ export default function ReportsPage() {
   );
 }
 
+
+    
