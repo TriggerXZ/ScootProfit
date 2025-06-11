@@ -14,6 +14,8 @@ import {
   parseISO,
   format,
   isSameDay,
+  getDay,
+  addDays,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -47,8 +49,7 @@ export function getEntriesForDate(entries: RevenueEntry[], date: Date): RevenueE
 const calculateAggregatedTotals = (
   periodEntries: RevenueEntry[], 
   periodLabel: string,
-  isWeeklyReportContext: boolean, // True if called from getWeeklyTotals, false for getMonthlyTotals
-  applyDeductionsForThisPeriod: boolean // True if deductions should be applied for this specific period
+  applyDeductionsForThisPeriod: boolean
 ): AggregatedTotal => {
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
 
@@ -58,7 +59,7 @@ const calculateAggregatedTotals = (
 
   let deductionsDetail: DeductionsDetail;
 
-  if (applyDeductionsForThisPeriod) {
+  if (applyDeductionsForThisPeriod && NUMBER_OF_MEMBERS > 0) {
     const totalZonaSegura = DEDUCTION_ZONA_SEGURA_PER_MEMBER * NUMBER_OF_MEMBERS;
     const totalArriendo = DEDUCTION_ARRIENDO_PER_MEMBER * NUMBER_OF_MEMBERS;
     const totalAporteCooperativa = DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER * NUMBER_OF_MEMBERS;
@@ -69,7 +70,6 @@ const calculateAggregatedTotals = (
       totalDeductions: totalZonaSegura + totalArriendo + totalAporteCooperativa,
     };
   } else {
-    // No deductions applied for this period (e.g., weekly report not in the first week of month)
     deductionsDetail = {
       zonaSegura: 0,
       arriendo: 0,
@@ -80,9 +80,9 @@ const calculateAggregatedTotals = (
 
   const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
 
-  const netMemberShare = netRevenueToDistribute > 0 && NUMBER_OF_MEMBERS > 0 
+  const netMemberShare = NUMBER_OF_MEMBERS > 0 
     ? netRevenueToDistribute / NUMBER_OF_MEMBERS 
-    : (netRevenueToDistribute <=0 && NUMBER_OF_MEMBERS > 0 ? netRevenueToDistribute / NUMBER_OF_MEMBERS : 0) ;
+    : 0;
 
 
   return {
@@ -97,7 +97,7 @@ const calculateAggregatedTotals = (
 };
 
 export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  const weeklyAggregations: { [weekStart: string]: { entries: RevenueEntry[], monthForDeductionContext: Date } } = {};
+  const weeklyAggregations: { [weekStart: string]: RevenueEntry[] } = {};
 
   entries.forEach(entry => {
     const entryDate = parseISO(entry.date);
@@ -105,24 +105,25 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     const weekStartString = format(weekStartDateForEntry, 'yyyy-MM-dd');
 
     if (!weeklyAggregations[weekStartString]) {
-      // The month context for deductions is the month in which the Tuesday (week start) falls.
-      weeklyAggregations[weekStartString] = { entries: [], monthForDeductionContext: startOfMonth(weekStartDateForEntry) };
+      weeklyAggregations[weekStartString] = [];
     }
-    weeklyAggregations[weekStartString].entries.push(entry);
+    weeklyAggregations[weekStartString].push(entry);
   });
   
-  return Object.entries(weeklyAggregations).map(([weekStart, data]) => {
-    const { entries: periodEntries, monthForDeductionContext } = data;
+  return Object.entries(weeklyAggregations).map(([weekStart, periodEntries]) => {
     const currentWeekStartDateObj = parseISO(weekStart);
     const periodLabel = `Semana del ${format(currentWeekStartDateObj, 'PPP', { locale: es })}`;
     
-    // Deductions for 'monthForDeductionContext' are applied if this 'weekStart' (Tuesday)
-    // is the same Tuesday that starts the week containing the 1st of 'monthForDeductionContext'.
-    const firstTuesdayOfAssociatedMonth = startOfWeek(monthForDeductionContext, { locale: es, weekStartsOn: 2 });
+    // Determine if this week starts on the first Tuesday of its month
+    const firstDayOfTheMonthOfThisWeek = startOfMonth(currentWeekStartDateObj);
+    // getDay returns 0 for Sunday, 1 for Monday, ..., 6 for Saturday. We want Tuesday (2).
+    const dayOfWeekOfFirstDay = getDay(firstDayOfTheMonthOfThisWeek);
+    const daysToAddForFirstTuesday = (2 - dayOfWeekOfFirstDay + 7) % 7;
+    const firstTuesdayOfThisMonth = addDays(firstDayOfTheMonthOfThisWeek, daysToAddForFirstTuesday);
     
-    const applyDeductionsThisWeek = isSameDay(currentWeekStartDateObj, firstTuesdayOfAssociatedMonth);
+    const applyDeductionsThisWeek = isSameDay(currentWeekStartDateObj, firstTuesdayOfThisMonth);
 
-    return calculateAggregatedTotals(periodEntries, periodLabel, true, applyDeductionsThisWeek);
+    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductionsThisWeek);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
@@ -142,8 +143,8 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
 
   return Object.entries(monthlyAggregations).map(([monthStart, periodEntries]) => {
     const periodLabel = format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es });
-    // For monthly reports, deductions are always applied. The 'isFirstWeek' flag is not relevant here.
-    return calculateAggregatedTotals(periodEntries, periodLabel, false, true);
+    // For monthly reports, deductions are always applied.
+    return calculateAggregatedTotals(periodEntries, periodLabel, true);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
@@ -160,3 +161,4 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
+
