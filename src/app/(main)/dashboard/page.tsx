@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const currentMonthTotal = React.useMemo(() => {
     const currentMonthStr = format(new Date(), 'MMMM yyyy', { locale: es });
     const monthData = allMonthlyTotals().find(m => m.period === currentMonthStr);
-    return monthData ? monthData.total : 0;
+    return monthData ? monthData.totalRevenueInPeriod : 0;
   }, [allMonthlyTotals]);
 
   const averageDailyRevenue = React.useMemo(() => {
@@ -51,7 +51,7 @@ export default function DashboardPage() {
       const dailyTotalForEntry = calculateDailyTotal(entry).total;
       const current = dailyTotalsMap.get(dateStr) || { sum: 0, count: 0 };
       current.sum += dailyTotalForEntry;
-      current.count = 1; // Each entry for a date contributes to that day's single sum for averaging
+      current.count = 1; 
       dailyTotalsMap.set(dateStr, current);
     });
 
@@ -103,7 +103,7 @@ export default function DashboardPage() {
           title="Cuota por Miembro (Día)" 
           value={dailySummary ? formatCurrencyCOP(dailySummary.memberShare) : formatCurrencyCOP(0)}
           icon={Users}
-          description="Basado en el total diario"
+          description="Basado en el total diario bruto"
         />
          <StatCard 
           title="Total Mes Actual" 

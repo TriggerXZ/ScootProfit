@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { LOCATIONS, LOCATION_IDS, NUMBER_OF_MEMBERS } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, Users, FileText, TrendingUp, TrendingDown, CircleDollarSign, AlertCircle } from 'lucide-react';
+import { CalendarDays, MapPin, Users, FileText, TrendingUp, TrendingDown, CircleDollarSign, AlertCircle, Banknote } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -68,14 +68,17 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       {item.period}
                     </span>
                     <div className="text-right">
-                      <div className="text-xl font-semibold text-accent">{formatCurrencyCOP(item.netMemberShare)}</div>
-                      <div className="text-xs text-muted-foreground">Cuota Neta por Miembro</div>
+                      <div className="text-xl font-semibold text-accent flex items-center justify-end">
+                         <Banknote className="mr-1 h-5 w-5 text-accent/80" />
+                        {formatCurrencyCOP(item.totalRevenueInPeriod)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Ingresos Totales del Periodo</div>
                     </div>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="pt-2 pb-4 px-2 space-y-4 bg-muted/30 rounded-md">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                    <div className="font-medium text-foreground">Total Ingresos del Periodo:</div>
+                    <div className="font-medium text-foreground">Total Ingresos Brutos del Periodo:</div>
                     <div className="md:text-right font-semibold">{formatCurrencyCOP(item.totalRevenueInPeriod)}</div>
 
                     <div className="font-medium text-foreground">Cuota Bruta Estimada por Miembro:</div>
