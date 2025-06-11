@@ -15,7 +15,8 @@ export const NUMBER_OF_MEMBERS = 20;
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
 
-// Deducciones fijas para el período (costos operativos del negocio)
-export const DEDUCTION_ZONA_SEGURA = 20000;
-export const DEDUCTION_ARRIENDO = 299000;
-export const DEDUCTION_APORTE_COOPERATIVA = 72000;
+// Deducciones FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
+// Para obtener el costo total mensual del negocio para cada categoría, multiplicar por NUMBER_OF_MEMBERS.
+export const DEDUCTION_ZONA_SEGURA_PER_MEMBER = 20000; // Contribución por miembro al costo de Zona Segura
+export const DEDUCTION_ARRIENDO_PER_MEMBER = 299000; // Contribución por miembro al costo de Arriendo
+export const DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER = 72000; // Contribución por miembro al Aporte Cooperativa
