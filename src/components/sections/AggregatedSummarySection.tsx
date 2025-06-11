@@ -2,12 +2,19 @@
 "use client";
 
 import React from 'react';
-import type { AggregatedTotal, RevenueEntry } from '@/types';
+import type { AggregatedTotal } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
-import { LOCATIONS, LOCATION_IDS, NUMBER_OF_MEMBERS } from '@/lib/constants';
+import { 
+  LOCATIONS, 
+  LOCATION_IDS, 
+  NUMBER_OF_MEMBERS,
+  DEDUCTION_ZONA_SEGURA_PER_MEMBER,
+  DEDUCTION_ARRIENDO_PER_MEMBER,
+  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER
+} from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
 import { CalendarDays, MapPin, Users, FileText, TrendingUp, TrendingDown, CircleDollarSign, AlertCircle, Banknote } from 'lucide-react';
 
@@ -59,6 +66,10 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
         <Accordion type="single" collapsible className="w-full">
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
+            // Deductions are applied (and detailed) if totalDeductions > 0.
+            // This happens for monthly reports and the first week of the month for weekly reports.
+            const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
+
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
                 <AccordionTrigger className="hover:no-underline py-4">
@@ -84,44 +95,59 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                     <div className="font-medium text-foreground">Cuota Bruta Estimada por Miembro:</div>
                     <div className="md:text-right">{formatCurrencyCOP(item.grossMemberShare)}</div>
                     
-                    <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">(-) Costos Operativos del Negocio:</div>
-                    
-                    <div className="text-muted-foreground pl-4">Zona Segura:</div>
-                    <div className="md:text-right text-muted-foreground">{formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</div>
-                    
-                    <div className="text-muted-foreground pl-4">Arriendo:</div>
-                    <div className="md:text-right text-muted-foreground">{formatCurrencyCOP(item.deductionsDetail.arriendo)}</div>
+                    {showDeductionsDetails && (
+                      <>
+                        <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">(-) Costos Operativos del Negocio:</div>
+                        
+                        <div className="text-muted-foreground pl-4">Zona Segura:</div>
+                        <div className="md:text-right text-muted-foreground">
+                          {formatCurrencyCOP(item.deductionsDetail.zonaSegura)}
+                          <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_ZONA_SEGURA_PER_MEMBER)} / miembro)</span>
+                        </div>
+                        
+                        <div className="text-muted-foreground pl-4">Arriendo:</div>
+                        <div className="md:text-right text-muted-foreground">
+                          {formatCurrencyCOP(item.deductionsDetail.arriendo)}
+                          <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_ARRIENDO_PER_MEMBER)} / miembro)</span>
+                        </div>
 
-                    <div className="text-muted-foreground pl-4">Aporte Cooperativa:</div>
-                    <div className="md:text-right text-muted-foreground">{formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</div>
+                        <div className="text-muted-foreground pl-4">Aporte Cooperativa:</div>
+                        <div className="md:text-right text-muted-foreground">
+                          {formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}
+                          <span className="text-xs ml-1">({formatCurrencyCOP(DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER)} / miembro)</span>
+                        </div>
 
-                    <div className="font-medium text-foreground">Total Costos Operativos:</div>
-                    <div className="md:text-right font-semibold">{formatCurrencyCOP(item.deductionsDetail.totalDeductions)}</div>
-                    
-                    <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">(=) Distribución a Miembros:</div>
+                        <div className="font-medium text-foreground">Total Costos Operativos:</div>
+                        <div className="md:text-right font-semibold">{formatCurrencyCOP(item.deductionsDetail.totalDeductions)}</div>
+                        
+                        <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">(=) Distribución a Miembros:</div>
 
-                    <div className="font-medium text-foreground">Ingreso Neto a Distribuir (Total):</div>
-                     <div className={`md:text-right font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-green-600'}`}>
-                      {formatCurrencyCOP(item.netRevenueToDistribute)}
-                      {item.netRevenueToDistribute < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
-                    </div>
-                    
-                    <div className="font-bold text-lg text-foreground mt-2">Cuota Neta Final por Miembro:</div>
-                    <div className={`md:text-right font-bold text-lg mt-2 ${item.netMemberShare < 0 ? 'text-destructive' : 'text-accent'}`}>
-                      {formatCurrencyCOP(item.netMemberShare)}
-                      {item.netMemberShare < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
-                    </div>
+                        <div className="font-medium text-foreground">Ingreso Neto a Distribuir (Total):</div>
+                         <div className={`md:text-right font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                          {formatCurrencyCOP(item.netRevenueToDistribute)}
+                          {item.netRevenueToDistribute < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
+                        </div>
+                        
+                        <div className="font-bold text-lg text-foreground mt-2">Cuota Neta Final por Miembro:</div>
+                        <div className={`md:text-right font-bold text-lg mt-2 ${item.netMemberShare < 0 ? 'text-destructive' : 'text-accent'}`}>
+                          {formatCurrencyCOP(item.netMemberShare)}
+                          {item.netMemberShare < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  <Button 
-                    onClick={() => onDownloadInvoice(item)} 
-                    variant="outline" 
-                    size="sm"
-                    className="mt-4 w-full md:w-auto"
-                  >
-                    <FileText className="mr-2 h-4 w-4" />
-                    Descargar Liquidación PDF
-                  </Button>
+                  {showDeductionsDetails && ( // Only show invoice button if deductions are detailed
+                    <Button 
+                      onClick={() => onDownloadInvoice(item)} 
+                      variant="outline" 
+                      size="sm"
+                      className="mt-4 w-full md:w-auto"
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Descargar Liquidación PDF
+                    </Button>
+                  )}
                   
                   <h4 className="text-md font-semibold pt-3 border-t border-border mt-4 text-foreground">Detalle por Punto de Venta (Ingresos Brutos):</h4>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -153,3 +179,5 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
     </Card>
   );
 }
+
+    
