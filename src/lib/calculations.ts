@@ -1,17 +1,18 @@
 
-import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue } from '@/types';
-import { NUMBER_OF_MEMBERS, LOCATION_IDS, LocationId } from './constants';
+import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail } from '@/types';
+import { 
+  NUMBER_OF_MEMBERS, 
+  LOCATION_IDS, 
+  LocationId,
+  DEDUCTION_ZONA_SEGURA,
+  DEDUCTION_ARRIENDO,
+  DEDUCTION_APORTE_COOPERATIVA
+} from './constants';
 import {
   startOfWeek,
-  endOfWeek,
   startOfMonth,
-  endOfMonth,
-  isWithinInterval,
   parseISO,
   format,
-  eachDayOfInterval,
-  getMonth,
-  getYear,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -21,6 +22,7 @@ export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   return {
     date: entry.date,
     total,
+    // This memberShare at daily level is a gross calculation based on that day's income
     memberShare: total > 0 && NUMBER_OF_MEMBERS > 0 ? total / NUMBER_OF_MEMBERS : 0,
     locationTotals: entry.revenues,
   };
@@ -42,65 +44,82 @@ export function getEntriesForDate(entries: RevenueEntry[], date: Date): RevenueE
     return entries.filter(entry => entry.date === dateString);
 }
 
-export function getWeeklyTotals(entries: RevenueEntry[], date: Date = new Date()): AggregatedTotal[] {
-  const weeklyAggregations: { [weekStart: string]: { total: number, memberShare: number, entries: RevenueEntry[] } } = {};
+const calculateAggregatedTotals = (
+  periodEntries: RevenueEntry[], 
+  periodLabel: string
+): AggregatedTotal => {
+  const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
+
+  const grossMemberShare = totalRevenueInPeriod > 0 && NUMBER_OF_MEMBERS > 0 
+    ? totalRevenueInPeriod / NUMBER_OF_MEMBERS 
+    : 0;
+
+  const deductionsDetail: DeductionsDetail = {
+    zonaSegura: DEDUCTION_ZONA_SEGURA,
+    arriendo: DEDUCTION_ARRIENDO,
+    aporteCooperativa: DEDUCTION_APORTE_COOPERATIVA,
+    totalDeductions: DEDUCTION_ZONA_SEGURA + DEDUCTION_ARRIENDO + DEDUCTION_APORTE_COOPERATIVA,
+  };
+
+  const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
+
+  const netMemberShare = netRevenueToDistribute > 0 && NUMBER_OF_MEMBERS > 0 
+    ? netRevenueToDistribute / NUMBER_OF_MEMBERS 
+    : 0;
+
+  return {
+    period: periodLabel,
+    totalRevenueInPeriod,
+    grossMemberShare,
+    deductionsDetail,
+    netRevenueToDistribute,
+    netMemberShare,
+    entries: periodEntries,
+  };
+};
+
+export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+  const weeklyAggregations: { [weekStart: string]: RevenueEntry[] } = {};
 
   entries.forEach(entry => {
     const entryDate = parseISO(entry.date);
-    // Adjust week to start on Tuesday (0=Sun, 1=Mon, 2=Tue)
-    const weekStartDate = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 });
+    const weekStartDate = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 }); // Tuesday
     const weekStartString = format(weekStartDate, 'yyyy-MM-dd');
 
     if (!weeklyAggregations[weekStartString]) {
-      weeklyAggregations[weekStartString] = { total: 0, memberShare: 0, entries: [] };
+      weeklyAggregations[weekStartString] = [];
     }
-    const dailySum = calculateDailyTotal(entry).total;
-    weeklyAggregations[weekStartString].total += dailySum;
-    weeklyAggregations[weekStartString].entries.push(entry);
+    weeklyAggregations[weekStartString].push(entry);
   });
   
-  return Object.entries(weeklyAggregations).map(([weekStart, data]) => {
-    const totalForPeriod = data.total;
-    const memberShareForPeriod = totalForPeriod > 0 && NUMBER_OF_MEMBERS > 0 ? totalForPeriod / NUMBER_OF_MEMBERS : 0;
-    return {
-      period: `Semana del ${format(parseISO(weekStart), 'PPP', { locale: es })}`,
-      total: totalForPeriod,
-      memberShare: memberShareForPeriod,
-      entries: data.entries,
-    };
+  return Object.entries(weeklyAggregations).map(([weekStart, periodEntries]) => {
+    const periodLabel = `Semana del ${format(parseISO(weekStart), 'PPP', { locale: es })}`;
+    return calculateAggregatedTotals(periodEntries, periodLabel);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
 export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  const monthlyAggregations: { [monthStart: string]: { total: number, entries: RevenueEntry[] } } = {};
+  const monthlyAggregations: { [monthStart: string]: RevenueEntry[] } = {};
 
   entries.forEach(entry => {
     const entryDate = parseISO(entry.date);
     const monthStartDate = startOfMonth(entryDate);
-    const monthStartString = format(monthStartDate, 'yyyy-MM'); // Use YYYY-MM for grouping
+    const monthStartString = format(monthStartDate, 'yyyy-MM');
 
     if (!monthlyAggregations[monthStartString]) {
-      monthlyAggregations[monthStartString] = { total: 0, entries: [] };
+      monthlyAggregations[monthStartString] = [];
     }
-    const dailySum = calculateDailyTotal(entry).total;
-    monthlyAggregations[monthStartString].total += dailySum;
-    monthlyAggregations[monthStartString].entries.push(entry);
+    monthlyAggregations[monthStartString].push(entry);
   });
 
-  return Object.entries(monthlyAggregations).map(([monthStart, data]) => {
-    const totalForPeriod = data.total;
-    const memberShareForPeriod = totalForPeriod > 0 && NUMBER_OF_MEMBERS > 0 ? totalForPeriod / NUMBER_OF_MEMBERS : 0;
-    return {
-      period: format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es }), // Add day for parsing
-      total: totalForPeriod,
-      memberShare: memberShareForPeriod,
-      entries: data.entries,
-    };
+  return Object.entries(monthlyAggregations).map(([monthStart, periodEntries]) => {
+    const periodLabel = format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es });
+    return calculateAggregatedTotals(periodEntries, periodLabel);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = getMonthlyTotals(entries); // This already aggregates
+  const monthlyTotals = getMonthlyTotals(entries); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries.reduce((min, p) => (p.date < min ? p.date : min), a.entries[0].date)) : new Date(0);
@@ -108,8 +127,7 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     return dateA.getTime() - dateB.getTime();
   });
 
-
   return sortedMonthlyTotals
-    .map(monthly => `${monthly.period}:${Math.round(monthly.total)}`)
+    .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }

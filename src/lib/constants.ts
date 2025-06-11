@@ -1,3 +1,4 @@
+
 export const LOCATIONS = {
   LA72: { id: 'la72', name: 'La 72' },
   EL_CUBO: { id: 'elCubo', name: 'El Cubo' },
@@ -13,3 +14,8 @@ export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as Locat
 export const NUMBER_OF_MEMBERS = 20;
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
+
+// Deducciones fijas para el período (costos operativos del negocio)
+export const DEDUCTION_ZONA_SEGURA = 20000;
+export const DEDUCTION_ARRIENDO = 299000;
+export const DEDUCTION_APORTE_COOPERATIVA = 72000;
