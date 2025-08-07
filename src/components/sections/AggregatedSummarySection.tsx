@@ -10,13 +10,14 @@ import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { 
   LOCATIONS, 
   LOCATION_IDS, 
-  NUMBER_OF_MEMBERS,
   DEDUCTION_ZONA_SEGURA_PER_MEMBER,
   DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER
+  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
+  GROUPS,
+  GROUP_IDS
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, Users, FileText, TrendingUp, TrendingDown, CircleDollarSign, AlertCircle, Banknote } from 'lucide-react';
+import { CalendarDays, MapPin, Users, FileText, TrendingDown, CircleDollarSign, AlertCircle, Banknote, Group } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -133,12 +134,9 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         </div>
                       </>
                     )}
-                    {!showDeductionsDetails && ( // Display this when no deductions are applied (e.g., non-first weeks)
+                     {!showDeductionsDetails && (
                         <>
-                          <div className="col-span-1 md:col-span-2 mt-2 mb-1 font-semibold text-foreground">Costos Operativos del Negocio:</div>
-                          <div className="col-span-1 md:col-span-2 text-muted-foreground text-center py-2">
-                            No se aplican costos operativos detallados para este período semanal.
-                          </div>
+                           <div className="col-span-1 md:col-span-2 mt-2 font-semibold text-foreground">(=) Distribución a Miembros:</div>
                            <div className="font-bold text-lg text-foreground mt-2">Cuota Neta Final por Miembro:</div>
                            <div className={`md:text-right font-bold text-lg mt-2 text-accent`}>
                              {formatCurrencyCOP(item.netMemberShare)}
@@ -146,7 +144,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         </>
                     )}
                   </div>
-
+                  
                   <Button 
                     onClick={() => onDownloadInvoice(item)} 
                     variant="outline" 
@@ -156,6 +154,19 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                     <FileText className="mr-2 h-4 w-4" />
                     Descargar Liquidación PDF
                   </Button>
+
+                  <h4 className="text-md font-semibold pt-3 border-t border-border mt-4 text-foreground flex items-center gap-2">
+                    <Group className="h-5 w-5" />
+                    Detalle por Grupo (Ingresos Brutos):
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {GROUP_IDS.map(groupId => (
+                      <div key={groupId} className="flex items-center justify-between p-2 bg-card rounded-md border">
+                        <span className="text-sm font-medium">{(Object.values(GROUPS).find(g => g.id === groupId))?.name || groupId}</span>
+                        <span className="font-medium text-sm">{formatCurrencyCOP(item.groupRevenueTotals[groupId])}</span>
+                      </div>
+                    ))}
+                  </div>
                   
                   <h4 className="text-md font-semibold pt-3 border-t border-border mt-4 text-foreground">Detalle por Punto de Venta (Ingresos Brutos):</h4>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -169,6 +180,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       </div>
                     ))}
                   </div>
+
                   <h4 className="text-md font-semibold mt-3 mb-1 text-foreground">Registros Individuales (Ingresos Brutos Diarios):</h4>
                   <ul className="space-y-1 max-h-60 overflow-y-auto pr-1">
                     {item.entries.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(entry => (
@@ -187,6 +199,3 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
     </Card>
   );
 }
-    
-
-    

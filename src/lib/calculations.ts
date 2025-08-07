@@ -1,12 +1,15 @@
 
-import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail } from '@/types';
+import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue } from '@/types';
 import { 
   NUMBER_OF_MEMBERS, 
   LOCATION_IDS, 
   LocationId,
   DEDUCTION_ZONA_SEGURA_PER_MEMBER,
   DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER
+  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
+  ROTATION_START_DATE,
+  INITIAL_ROTATION_ASSIGNMENT,
+  GROUP_IDS,
 } from './constants';
 import {
   startOfWeek,
@@ -16,9 +19,27 @@ import {
   isSameDay,
   getDay,
   addDays,
+  differenceInWeeks,
+  add,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+/**
+ * Determines which group was assigned to a specific location on a given date.
+ */
+export function getGroupForLocationOnDate(locationId: LocationId, date: Date): GroupId {
+  const rotationStartDate = parseISO(ROTATION_START_DATE);
+  // Weeks are calculated starting on Tuesday, to match the business week.
+  const weeksSinceRotationStart = differenceInWeeks(date, rotationStartDate, { weekStartsOn: 2 });
+  const locationIndex = LOCATION_IDS.indexOf(locationId);
+  const numberOfGroups = INITIAL_ROTATION_ASSIGNMENT.length;
+  
+  // The shift for the given location is its initial index plus the number of weeks passed.
+  const shiftedIndex = (locationIndex + weeksSinceRotationStart) % numberOfGroups;
+
+  // The group at that shifted position in the initial assignment is the current group.
+  return INITIAL_ROTATION_ASSIGNMENT[shiftedIndex];
+}
 
 export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   const total = LOCATION_IDS.reduce((sum, locId) => sum + (entry.revenues[locId] || 0), 0);
@@ -52,6 +73,15 @@ const calculateAggregatedTotals = (
   applyDeductionsForThisPeriod: boolean
 ): AggregatedTotal => {
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
+
+  const groupRevenueTotals: GroupRevenue = { grupoCubo: 0, grupoLuces: 0, grupo78: 0, grupo72: 0 };
+  periodEntries.forEach(entry => {
+    const entryDate = parseISO(entry.date);
+    LOCATION_IDS.forEach(locId => {
+      const group = getGroupForLocationOnDate(locId, entryDate);
+      groupRevenueTotals[group] += entry.revenues[locId] || 0;
+    });
+  });
 
   const grossMemberShare = totalRevenueInPeriod > 0 && NUMBER_OF_MEMBERS > 0 
     ? totalRevenueInPeriod / NUMBER_OF_MEMBERS 
@@ -92,6 +122,7 @@ const calculateAggregatedTotals = (
     deductionsDetail,
     netRevenueToDistribute,
     netMemberShare,
+    groupRevenueTotals,
     entries: periodEntries,
   };
 };
@@ -116,7 +147,7 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     
     // Determine if this week starts on the first Tuesday of its month
     const firstDayOfTheMonthOfThisWeek = startOfMonth(currentWeekStartDateObj);
-    // getDay returns 0 for Sunday, 1 for Monday, ..., 6 for Saturday. We want Tuesday (2).
+    // getDay returns 0 for Sunday, ..., 2 for Tuesday, ..., 6 for Saturday.
     const dayOfWeekOfFirstDay = getDay(firstDayOfTheMonthOfThisWeek);
     const daysToAddForFirstTuesday = (2 - dayOfWeekOfFirstDay + 7) % 7;
     const firstTuesdayOfThisMonth = addDays(firstDayOfTheMonthOfThisWeek, daysToAddForFirstTuesday);
@@ -128,22 +159,36 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
 }
 
 export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  const monthlyAggregations: { [monthStart: string]: RevenueEntry[] } = {};
+  if (entries.length === 0) return [];
+  
+  const monthlyAggregations: { [periodKey: string]: RevenueEntry[] } = {};
+  
+  // Sort entries to find the absolute start date
+  const sortedEntries = entries.slice().sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  const firstEntryDate = parseISO(sortedEntries[0].date);
+  
+  // The first 28-day period starts on the first Tuesday on or before the first entry
+  const firstPeriodStartDate = startOfWeek(firstEntryDate, { locale: es, weekStartsOn: 2 });
 
-  entries.forEach(entry => {
+  sortedEntries.forEach(entry => {
     const entryDate = parseISO(entry.date);
-    const monthStartDate = startOfMonth(entryDate);
-    const monthStartString = format(monthStartDate, 'yyyy-MM');
+    const diffInDays = Math.floor((entryDate.getTime() - firstPeriodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const periodIndex = Math.floor(diffInDays / 28);
+    
+    const periodStartDate = add(firstPeriodStartDate, { days: periodIndex * 28 });
+    const periodKey = format(periodStartDate, 'yyyy-MM-dd');
 
-    if (!monthlyAggregations[monthStartString]) {
-      monthlyAggregations[monthStartString] = [];
+    if (!monthlyAggregations[periodKey]) {
+      monthlyAggregations[periodKey] = [];
     }
-    monthlyAggregations[monthStartString].push(entry);
+    monthlyAggregations[periodKey].push(entry);
   });
 
-  return Object.entries(monthlyAggregations).map(([monthStart, periodEntries]) => {
-    const periodLabel = format(parseISO(monthStart + '-01'), 'MMMM yyyy', { locale: es });
-    // For monthly reports, deductions are always applied.
+  return Object.entries(monthlyAggregations).map(([periodStart, periodEntries]) => {
+    const startDate = parseISO(periodStart);
+    const endDate = add(startDate, { days: 27 });
+    const periodLabel = `Periodo del ${format(startDate, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
+    
     return calculateAggregatedTotals(periodEntries, periodLabel, true);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
@@ -161,4 +206,3 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
-
