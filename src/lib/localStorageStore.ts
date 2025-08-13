@@ -1,3 +1,4 @@
+
 // This file should only be imported and used in Client Components.
 import type { RevenueEntry } from '@/types';
 import { LOCAL_STORAGE_REVENUE_KEY } from './constants';
@@ -24,6 +25,12 @@ export function addOrUpdateRevenueEntry(entry: RevenueEntry): void {
   // Sort entries by date descending
   entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   saveRevenueEntries(entries);
+}
+
+export function deleteRevenueEntry(id: string): void {
+    let entries = getRevenueEntries();
+    entries = entries.filter(entry => entry.id !== id);
+    saveRevenueEntries(entries);
 }
 
 export function getRevenueEntryById(id: string): RevenueEntry | undefined {

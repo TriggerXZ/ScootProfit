@@ -6,33 +6,36 @@ import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenueInput } 
 import { 
   getRevenueEntries as fetchEntries, 
   addOrUpdateRevenueEntry as saveEntry,
-  getRevenueEntryById as fetchEntryById
+  getRevenueEntryById as fetchEntryById,
+  deleteRevenueEntry as removeEntry
 } from '@/lib/localStorageStore';
 import { 
   calculateDailyTotal, 
   getWeeklyTotals, 
   getMonthlyTotals,
-  getEntriesForDate
 } from '@/lib/calculations';
-import { LOCATION_IDS } from '@/lib/constants';
+import { LOCATION_IDS, LocationId } from '@/lib/constants';
 import { format } from 'date-fns';
 
 export function useRevenueEntries() {
   const [entries, setEntries] = useState<RevenueEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const refreshEntries = useCallback(() => {
+    setIsLoading(true);
     setEntries(fetchEntries());
     setIsLoading(false);
   }, []);
 
-  const refreshEntries = useCallback(() => {
-    setEntries(fetchEntries());
-  }, []);
+  useEffect(() => {
+    refreshEntries();
+  }, [refreshEntries]);
+
 
   const addEntry = useCallback((date: string, revenuesInput: LocationRevenueInput) => {
     const revenues = LOCATION_IDS.reduce((acc, locId) => {
-      acc[locId] = parseFloat(revenuesInput[locId]) || 0;
+      const parsedValue = parseFloat(revenuesInput[locId as LocationId]);
+      acc[locId as LocationId] = isNaN(parsedValue) ? 0 : parsedValue;
       return acc;
     }, {} as Record<LocationId, number>);
 
@@ -42,6 +45,11 @@ export function useRevenueEntries() {
       revenues: revenues as any, // Type assertion after construction
     };
     saveEntry(newEntry);
+    refreshEntries();
+  }, [refreshEntries]);
+
+  const deleteEntry = useCallback((id: string) => {
+    removeEntry(id);
     refreshEntries();
   }, [refreshEntries]);
 
@@ -68,6 +76,7 @@ export function useRevenueEntries() {
     entries,
     isLoading,
     addEntry,
+    deleteEntry,
     getEntryByDate,
     getDailySummary,
     allWeeklyTotals,

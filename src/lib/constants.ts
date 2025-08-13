@@ -2,7 +2,7 @@
 export const LOCATIONS = {
   LA72: { id: 'la72', name: 'La 72' },
   EL_CUBO: { id: 'elCubo', name: 'El Cubo' },
-  PARQUE_DE_LAS_LUCES: { id: 'parqueDeLasLuces', name: 'Parque de las Luces' },
+  PARQUE_DE_LAS_LUCES: { id: 'parqueDeLasLuces', name: 'P. de las Luces' },
   LA78: { id: 'la78', name: 'La 78' },
 } as const;
 
@@ -11,6 +11,7 @@ export type LocationId = keyof typeof LOCATIONS extends infer T ? T extends stri
 export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as LocationId[];
 
 export const DEFAULT_NUMBER_OF_MEMBERS = 20;
+export const DEFAULT_MONTHLY_GOAL = 30000000; // Default goal of 30 million COP
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
 export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';

@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/cards/StatCard';
+import { GoalProgressCard } from '@/components/cards/GoalProgressCard';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { calculateDailyTotal } from '@/lib/calculations';
@@ -14,7 +15,6 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 
 export default function DashboardPage() {
@@ -38,11 +38,12 @@ export default function DashboardPage() {
     refreshEntries(); 
   }, [refreshEntries]);
 
-  const currentMonthTotal = React.useMemo(() => {
-    if (isLoading) return 0;
-    const monthData = allMonthlyTotals()[0]; // The totals are sorted descending, so the first one is the most recent
-    return monthData ? monthData.totalRevenueInPeriod : 0;
-  }, [allMonthlyTotals, isLoading]);
+  const currentMonthData = React.useMemo(() => {
+    if (isLoading || entries.length === 0) return null;
+    const totals = allMonthlyTotals();
+    return totals.length > 0 ? totals[0] : null;
+  }, [allMonthlyTotals, isLoading, entries]);
+
 
   const averageDailyRevenue = React.useMemo(() => {
     if (entries.length === 0) return 0;
@@ -98,9 +99,9 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
           title="Total Período Actual (28 días)" 
-          value={formatCurrencyCOP(currentMonthTotal)}
+          value={formatCurrencyCOP(currentMonthData?.totalRevenueInPeriod ?? 0)}
           icon={Calendar}
-          description="Ingresos del último período de 28 días"
+          description={currentMonthData?.period ?? "Ingresos del último período"}
         />
         <StatCard 
           title="Promedio Diario (Hist.)" 
@@ -134,39 +135,42 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-lg lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-headline text-xl">
-              Detalle del {selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd')) : ''}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-             {dailySummary ? (
-                <div className="space-y-4">
-                  {LOCATION_IDS.map(locId => (
-                    <div key={locId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-background rounded-md">
-                           <MapPin className="h-5 w-5 text-primary" />
+        <div className="lg:col-span-2 space-y-6">
+          <GoalProgressCard currentPeriod={currentMonthData} />
+          <Card className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-headline text-xl">
+                Detalle del {selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd')) : ''}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {dailySummary ? (
+                  <div className="space-y-4">
+                    {LOCATION_IDS.map(locId => (
+                      <div key={locId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-background rounded-md">
+                            <MapPin className="h-5 w-5 text-primary" />
+                          </div>
+                          <span className="font-medium text-foreground">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
                         </div>
-                        <span className="font-medium text-foreground">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
+                        <span className="font-semibold text-lg text-foreground">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
                       </div>
-                      <span className="font-semibold text-lg text-foreground">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                    <p className="text-muted-foreground mb-4">No se encontraron ingresos para la fecha seleccionada.</p>
-                    <Link href="/entry" passHref>
-                      <Button variant="outline">
-                        <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
-                      </Button>
-                    </Link>
-                </div>
-              )}
-          </CardContent>
-        </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                      <p className="text-muted-foreground mb-4">No se encontraron ingresos para la fecha seleccionada.</p>
+                      <Link href="/entry" passHref>
+                        <Button variant="outline">
+                          <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
+                        </Button>
+                      </Link>
+                  </div>
+                )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
       
       <div className="mt-8 text-center">

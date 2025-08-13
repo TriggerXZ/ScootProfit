@@ -1,17 +1,19 @@
 
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AggregatedSummarySection } from '@/components/sections/AggregatedSummarySection';
+import { GroupPerformanceChart } from '@/components/charts/GroupPerformanceChart';
+import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { FileDown, FileText, BarChart2 } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
-import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
+import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS } from '@/lib/constants';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 
 export default function ReportsPage() {
@@ -19,6 +21,26 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('weekly');
   const weeklyReportRef = useRef<HTMLDivElement>(null);
   const monthlyReportRef = useRef<HTMLDivElement>(null);
+
+  const { groupTotals, locationTotals } = useMemo(() => {
+    const allTotals = allMonthlyTotals();
+    const groupMap: { [key: string]: number } = {};
+    const locationMap: { [key: string]: number } = {};
+
+    allTotals.forEach(period => {
+      for (const [group, revenue] of Object.entries(period.groupRevenueTotals)) {
+        groupMap[group] = (groupMap[group] || 0) + revenue;
+      }
+      period.entries.forEach(entry => {
+        for (const [location, revenue] of Object.entries(entry.revenues)) {
+          locationMap[location] = (locationMap[location] || 0) + revenue;
+        }
+      });
+    });
+
+    return { groupTotals: groupMap, locationTotals: locationMap };
+  }, [allMonthlyTotals]);
+
 
   const handleDownloadReportPDF = async () => {
     const html2pdf = (await import('html2pdf.js')).default; 
@@ -38,9 +60,6 @@ export default function ReportsPage() {
           logging: false, 
           width: elementToPrint.scrollWidth, 
           windowWidth: elementToPrint.scrollWidth,
-          onrendered: function (canvas: HTMLCanvasElement) {
-            // This is a spot to potentially manipulate the canvas if needed, but usually not required.
-          }
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as any[] } 
@@ -62,10 +81,6 @@ export default function ReportsPage() {
         (el as HTMLElement).style.overflow = 'visible';
          (el as HTMLElement).style.display = 'block'; 
       });
-      clonedElement.querySelectorAll('ul.max-h-60').forEach(ul => {
-        (ul as HTMLElement).style.maxHeight = 'none';
-        (ul as HTMLElement).style.overflowY = 'visible';
-      });
 
       const titleElement = document.createElement('h1');
       titleElement.innerText = reportTitle;
@@ -74,14 +89,14 @@ export default function ReportsPage() {
       titleElement.style.textAlign = 'center';
       titleElement.style.marginBottom = '10px'; 
       titleElement.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-headline') || 'Poppins, sans-serif'; 
-      const defaultTextColor = '#2c3e50'; // Dark gray as a fallback
-      titleElement.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || defaultTextColor;
+      const textColor = '#2c3e50';
+      titleElement.style.color = textColor;
 
       const container = document.createElement('div');
       container.style.width = '190mm'; 
       container.style.margin = '0 auto';
       container.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'PT Sans, sans-serif';
-      container.style.color = getComputedStyle(document.documentElement).getPropertyValue('--foreground').trim() || defaultTextColor;
+      container.style.color = textColor;
       container.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
       container.style.lineHeight = '1.5';
       container.style.fontSize = '10pt'; 
@@ -109,7 +124,7 @@ export default function ReportsPage() {
     const html2pdf = (await import('html2pdf.js')).default;
     const { es: localeEs } = await import('date-fns/locale/es');
     const currentDate = format(new Date(), 'PPP', { locale: localeEs });
-    const textColor = '#2c3e50'; // Explicit dark color for all text
+    const textColor = '#2c3e50';
 
     const invoiceHTML = `
       <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5; color: ${textColor};">
@@ -171,7 +186,7 @@ export default function ReportsPage() {
             </tr>
             <tr>
               <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netRevenueToDistribute >= 0 ? (item.netMemberShare > 0 ? '#28a745' : textColor) : '#dc3545'};">${formatCurrencyCOP(item.netMemberShare)}</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netRevenueToDistribute >= 0 && item.netMemberShare > 0 ? '#28a745' : '#dc3545'};">${formatCurrencyCOP(item.netMemberShare)}</td>
             </tr>
           </tbody>
         </table>
@@ -200,45 +215,66 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div>
         <h1 className="text-3xl font-headline font-bold text-foreground">Reportes de Ingresos</h1>
-        <Button onClick={handleDownloadReportPDF} variant="outline">
-          <FileDown className="mr-2 h-4 w-4" />
-          Descargar Resumen PDF
-        </Button>
+        <p className="text-muted-foreground mt-1">Analiza los ingresos semanales, mensuales y el rendimiento por grupo y ubicación.</p>
       </div>
+
+      <Card className="shadow-xl">
+        <CardHeader>
+           <div className="flex items-center gap-2">
+            <BarChart2 className="h-6 w-6 text-primary" />
+            <CardTitle className="font-headline text-2xl">Análisis de Rendimiento (Histórico)</CardTitle>
+          </div>
+          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación a lo largo del tiempo.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-8 md:grid-cols-2 pt-4">
+          <div className="h-80">
+            <h3 className="font-semibold mb-2 text-center">Rendimiento por Grupo</h3>
+            <GroupPerformanceChart groupTotals={groupTotals} />
+          </div>
+          <div className="h-80">
+            <h3 className="font-semibold mb-2 text-center">Ingresos por Ubicación</h3>
+            <LocationPerformanceChart locationTotals={locationTotals} />
+          </div>
+        </CardContent>
+      </Card>
       
-      <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2 md:w-1/2 lg:w-1/3 mb-6">
-          <TabsTrigger value="weekly" className="text-base py-2.5">Semanal</TabsTrigger>
-          <TabsTrigger value="monthly" className="text-base py-2.5">Mensual</TabsTrigger>
-        </TabsList>
-        <TabsContent value="weekly">
-          <div ref={weeklyReportRef}>
-            <AggregatedSummarySection 
-              title="Ingresos Semanales" 
-              totals={allWeeklyTotals()} 
-              isLoading={isLoading}
-              onDownloadInvoice={handleDownloadInvoicePDF}
-            />
-          </div>
-        </TabsContent>
-        <TabsContent value="monthly">
-           <div ref={monthlyReportRef}>
-            <AggregatedSummarySection 
-              title="Ingresos Mensuales" 
-              totals={allMonthlyTotals()} 
-              isLoading={isLoading}
-              onDownloadInvoice={handleDownloadInvoicePDF}
-            />
-          </div>
-        </TabsContent>
-      </Tabs>
+      <div>
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+          <h2 className="text-2xl font-headline font-bold text-foreground">Desglose de Períodos</h2>
+          <Button onClick={handleDownloadReportPDF} variant="outline">
+            <FileDown className="mr-2 h-4 w-4" />
+            Descargar Resumen PDF
+          </Button>
+        </div>
+        <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2 md:w-1/2 lg:w-1/3 mb-6">
+            <TabsTrigger value="weekly" className="text-base py-2.5">Semanal</TabsTrigger>
+            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual (28 Días)</TabsTrigger>
+          </TabsList>
+          <TabsContent value="weekly">
+            <div ref={weeklyReportRef}>
+              <AggregatedSummarySection 
+                title="Ingresos Semanales" 
+                totals={allWeeklyTotals()} 
+                isLoading={isLoading}
+                onDownloadInvoice={handleDownloadInvoicePDF}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="monthly">
+            <div ref={monthlyReportRef}>
+              <AggregatedSummarySection 
+                title="Ingresos Mensuales (Períodos de 28 días)" 
+                totals={allMonthlyTotals()} 
+                isLoading={isLoading}
+                onDownloadInvoice={handleDownloadInvoicePDF}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
-
-
-    
-
-    

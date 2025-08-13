@@ -13,7 +13,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { LOCATIONS, LOCATION_IDS, LocationId } from '@/lib/constants';
 import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Coins } from 'lucide-react';
 
@@ -34,6 +34,8 @@ type RevenueFormValues = z.infer<typeof formSchema>;
 interface RevenueEntryFormProps {
   onSubmitSuccess: (date: string, revenues: LocationRevenueInput) => void;
   getExistingEntry: (date: string) => RevenueEntry | undefined;
+  editingEntry: RevenueEntry | null;
+  onCancelEdit: () => void;
 }
 
 const formatInputValue = (value: string | number): string => {
@@ -47,7 +49,7 @@ const parseInputValue = (value: string): string => {
 };
 
 
-export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueEntryFormProps) {
+export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEntry, onCancelEdit }: RevenueEntryFormProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
@@ -55,7 +57,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
   const { control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<RevenueFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: undefined, // Initialize as undefined to prevent hydration mismatch
+      date: undefined,
       la72: "0",
       elCubo: "0",
       parqueDeLasLuces: "0",
@@ -65,12 +67,31 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
 
   useEffect(() => {
     const today = new Date();
-    setSelectedDate(today);
     setClientToday(today);
-  }, []);
+    if (!editingEntry) {
+        setSelectedDate(today);
+    }
+  }, [editingEntry]);
+  
+  useEffect(() => {
+    if (editingEntry) {
+      const entryDate = parseISO(editingEntry.date);
+      setSelectedDate(entryDate);
+      setValue("date", entryDate);
+      LOCATION_IDS.forEach(locId => {
+        setValue(locId, formatInputValue(editingEntry.revenues[locId]));
+      });
+    } else {
+        // When not editing, set to today and reset fields
+        const today = new Date();
+        setSelectedDate(today);
+        setValue("date", today);
+        LOCATION_IDS.forEach(locId => setValue(locId, "0"));
+    }
+  }, [editingEntry, setValue]);
 
   useEffect(() => {
-    if (selectedDate) {
+    if (selectedDate && !editingEntry) {
       setValue("date", selectedDate);
       const dateString = format(selectedDate, 'yyyy-MM-dd');
       const existingEntry = getExistingEntry(dateString);
@@ -84,7 +105,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
         });
       }
     }
-  }, [selectedDate, getExistingEntry, setValue]);
+  }, [selectedDate, getExistingEntry, setValue, editingEntry]);
 
 
   const processSubmit = (data: RevenueFormValues) => {
@@ -99,16 +120,24 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
     onSubmitSuccess(dateString, revenues);
 
     toast({
-      title: "Ingreso Guardado",
+      title: editingEntry ? "Ingreso Actualizado" : "Ingreso Guardado",
       description: `Los ingresos para ${format(data.date, 'PPP', { locale: es })} han sido guardados.`,
+    });
+    
+    reset({
+        date: new Date(),
+        la72: "0",
+        elCubo: "0",
+        parqueDeLasLuces: "0",
+        la78: "0",
     });
   };
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="font-headline text-2xl">Registrar Ingresos Diarios</CardTitle>
-        <CardDescription>Ingresa las ganancias para cada punto de alquiler.</CardDescription>
+        <CardTitle className="font-headline text-2xl">{editingEntry ? 'Editar Ingreso' : 'Registrar Ingresos Diarios'}</CardTitle>
+        <CardDescription>{editingEntry ? `Editando los ingresos del ${format(parseISO(editingEntry.date), 'PPP', { locale: es })}.` : 'Ingresa las ganancias para cada punto de alquiler.'}</CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit(processSubmit)}>
         <CardContent className="space-y-6">
@@ -121,10 +150,16 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
                 <DatePicker
                   date={field.value}
                   setDate={(date) => {
-                    field.onChange(date);
-                    setSelectedDate(date);
+                    if (!editingEntry) { // Only allow date changes if not in edit mode
+                        field.onChange(date);
+                        setSelectedDate(date);
+                    }
                   }}
-                  disabled={!clientToday ? () => true : (date) => date > clientToday || date < new Date("2020-01-01")}
+                  disabled={(date) => {
+                    if (editingEntry) return true; // Disable calendar if editing
+                    if (!clientToday) return true;
+                    return date > clientToday || date < new Date("2020-01-01");
+                  }}
                 />
               )}
             />
@@ -163,10 +198,15 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry }: RevenueE
             ))}
           </div>
         </CardContent>
-        <CardFooter>
-          <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" disabled={isSubmitting}>
-            {isSubmitting ? "Guardando..." : "Guardar Ingresos"}
-          </Button>
+        <CardFooter className="flex gap-4">
+            {editingEntry && (
+              <Button type="button" variant="outline" onClick={onCancelEdit} className="w-full text-lg py-6">
+                Cancelar
+              </Button>
+            )}
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" disabled={isSubmitting}>
+                {isSubmitting ? "Guardando..." : (editingEntry ? 'Actualizar Ingreso' : 'Guardar Ingresos')}
+            </Button>
         </CardFooter>
       </form>
     </Card>
