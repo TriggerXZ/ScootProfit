@@ -25,6 +25,11 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+/**
+ * Retrieves the configured number of members from localStorage,
+ * falling back to the default if not set.
+ * @returns The number of members.
+ */
 function getNumberOfMembers(): number {
   if (typeof window === 'undefined') {
     return DEFAULT_NUMBER_OF_MEMBERS;
@@ -37,6 +42,7 @@ function getNumberOfMembers(): number {
         return parsed.numberOfMembers;
       }
     } catch (e) {
+      console.error("Failed to parse settings from localStorage", e);
       return DEFAULT_NUMBER_OF_MEMBERS;
     }
   }
@@ -45,7 +51,11 @@ function getNumberOfMembers(): number {
 
 
 /**
- * Determines which group was assigned to a specific location on a given date.
+ * Determines which group was assigned to a specific location on a given date based on the weekly rotation schedule.
+ * The rotation shifts every Tuesday.
+ * @param locationId The ID of the location.
+ * @param date The date for which to determine the group.
+ * @returns The ID of the group assigned to the location on that date.
  */
 export function getGroupForLocationOnDate(locationId: LocationId, date: Date): GroupId {
   const rotationStartDate = parseISO(ROTATION_START_DATE);
@@ -61,6 +71,11 @@ export function getGroupForLocationOnDate(locationId: LocationId, date: Date): G
   return INITIAL_ROTATION_ASSIGNMENT[shiftedIndex];
 }
 
+/**
+ * Calculates the total revenue for a single day and the gross share per member.
+ * @param entry The revenue entry for the day.
+ * @returns A DailyTotal object with the total revenue and member share.
+ */
 export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   const total = LOCATION_IDS.reduce((sum, locId) => sum + (entry.revenues[locId] || 0), 0);
   const numberOfMembers = getNumberOfMembers();
@@ -72,6 +87,11 @@ export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   };
 }
 
+/**
+ * Calculates the total revenue for each location over a given period of entries.
+ * @param entries An array of revenue entries for the period.
+ * @returns A LocationRevenue object with the sum of revenues for each location.
+ */
 export function calculateLocationTotalsForPeriod(entries: RevenueEntry[]): LocationRevenue {
   const totals: LocationRevenue = { la72: 0, elCubo: 0, parqueDeLasLuces: 0, la78: 0 };
   for (const entry of entries) {
@@ -88,6 +108,14 @@ export function getEntriesForDate(entries: RevenueEntry[], date: Date): RevenueE
     return entries.filter(entry => entry.date === dateString);
 }
 
+/**
+ * Core function to calculate aggregated totals for a given period (weekly or monthly).
+ * It calculates gross revenue, applies deductions if specified, and determines net shares.
+ * @param periodEntries The revenue entries for the period.
+ * @param periodLabel A string label for the period (e.g., "Semana del...").
+ * @param applyDeductionsForThisPeriod A boolean indicating if business costs should be deducted for this period.
+ * @returns An AggregatedTotal object with a full financial breakdown.
+ */
 const calculateAggregatedTotals = (
   periodEntries: RevenueEntry[], 
   periodLabel: string,
@@ -96,6 +124,7 @@ const calculateAggregatedTotals = (
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
   const numberOfMembers = getNumberOfMembers();
 
+  // Calculate revenue totals per group for the period
   const groupRevenueTotals: GroupRevenue = { grupoCubo: 0, grupoLuces: 0, grupo78: 0, grupo72: 0 };
   periodEntries.forEach(entry => {
     const entryDate = parseISO(entry.date);
@@ -111,6 +140,7 @@ const calculateAggregatedTotals = (
 
   let deductionsDetail: DeductionsDetail;
 
+  // Calculate total business deductions if they apply to this period
   if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
     const totalZonaSegura = DEDUCTION_ZONA_SEGURA_PER_MEMBER * numberOfMembers;
     const totalArriendo = DEDUCTION_ARRIENDO_PER_MEMBER * numberOfMembers;
@@ -149,12 +179,19 @@ const calculateAggregatedTotals = (
   };
 };
 
+/**
+ * Aggregates all revenue entries into weekly totals, starting on Tuesdays.
+ * Deductions are only applied to the week that contains the first Tuesday of a calendar month.
+ * @param entries All revenue entries.
+ * @returns An array of AggregatedTotal objects, one for each week.
+ */
 export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   const weeklyAggregations: { [weekStart: string]: RevenueEntry[] } = {};
 
   entries.forEach(entry => {
     const entryDate = parseISO(entry.date);
-    const weekStartDateForEntry = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 }); // Tuesday
+    // Business weeks start on Tuesday (2)
+    const weekStartDateForEntry = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 });
     const weekStartString = format(weekStartDateForEntry, 'yyyy-MM-dd');
 
     if (!weeklyAggregations[weekStartString]) {
@@ -180,6 +217,12 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
+/**
+ * Aggregates all revenue entries into 28-day period totals.
+ * This aligns with the 4-week group rotation cycle. Deductions are always applied.
+ * @param entries All revenue entries.
+ * @returns An array of AggregatedTotal objects, one for each 28-day period.
+ */
 export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   if (entries.length === 0) return [];
   
@@ -211,10 +254,16 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     const endDate = add(startDate, { days: 27 });
     const periodLabel = `Periodo del ${format(startDate, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
     
+    // Monthly (28-day) periods always have deductions applied
     return calculateAggregatedTotals(periodEntries, periodLabel, true);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 }
 
+/**
+ * Generates a string of historical monthly (28-day period) data for the AI prediction model.
+ * @param entries All revenue entries.
+ * @returns A comma-separated string of period and total revenue pairs.
+ */
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
   const monthlyTotals = getMonthlyTotals(entries); 
   

@@ -55,7 +55,7 @@ export function WeeklyRevenueChart({ entries }: WeeklyRevenueChartProps) {
             fontSize={12}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => `${formatCurrencyCOP(value).replace('COP', '')}`}
+            tickFormatter={(value) => `${formatCurrencyCOP(value).replace(/\s*COP\s*/, '')}`}
           />
           <Tooltip
             cursor={false}

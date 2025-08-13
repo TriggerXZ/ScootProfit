@@ -39,9 +39,10 @@ export default function DashboardPage() {
   }, [refreshEntries]);
 
   const currentMonthTotal = React.useMemo(() => {
+    if (isLoading) return 0;
     const monthData = allMonthlyTotals()[0]; // The totals are sorted descending, so the first one is the most recent
     return monthData ? monthData.totalRevenueInPeriod : 0;
-  }, [allMonthlyTotals]);
+  }, [allMonthlyTotals, isLoading]);
 
   const averageDailyRevenue = React.useMemo(() => {
     if (entries.length === 0) return 0;
@@ -73,7 +74,7 @@ export default function DashboardPage() {
           <Skeleton className="h-10 w-1/3" />
           <Skeleton className="h-10 w-1/4" />
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
         </div>
         <Skeleton className="h-80 rounded-lg" />
@@ -83,33 +84,23 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <h1 className="text-3xl font-headline font-bold text-foreground">Dashboard</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+        <div>
+            <h1 className="text-3xl font-headline font-bold text-foreground">Dashboard</h1>
+            <p className="text-muted-foreground mt-1">Un resumen de la actividad reciente.</p>
+        </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Ver resumen para:</span>
+          <span className="text-sm text-muted-foreground shrink-0">Ver resumen para:</span>
           <DatePicker date={selectedDate} setDate={setSelectedDate} />
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-          title={`Total del Día (${selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd'), 'd MMM') : 'N/A'})`} 
-          value={dailySummary ? formatCurrencyCOP(dailySummary.total) : formatCurrencyCOP(0)}
-          icon={DollarSign}
-          description={dailySummary ? 'Ingresos consolidados del día' : 'No hay datos para esta fecha'}
-          valueClassName="text-accent"
-        />
-        <StatCard 
-          title="Cuota por Miembro (Día)" 
-          value={dailySummary ? formatCurrencyCOP(dailySummary.memberShare) : formatCurrencyCOP(0)}
-          icon={Users}
-          description="Basado en el total diario bruto"
-        />
-         <StatCard 
           title="Total Período Actual (28 días)" 
           value={formatCurrencyCOP(currentMonthTotal)}
           icon={Calendar}
-          description="Ingresos del último período"
+          description="Ingresos del último período de 28 días"
         />
         <StatCard 
           title="Promedio Diario (Hist.)" 
@@ -117,63 +108,71 @@ export default function DashboardPage() {
           icon={TrendingUp}
           description="Promedio de todos los registros"
         />
+        <StatCard 
+          title={`Total del Día (${selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd'), 'd MMM') : 'N/A'})`} 
+          value={dailySummary ? formatCurrencyCOP(dailySummary.total) : formatCurrencyCOP(0)}
+          icon={DollarSign}
+          description={dailySummary ? 'Ingresos consolidados del día' : 'No hay datos para esta fecha'}
+        />
+        <StatCard 
+          title="Cuota por Miembro (Día)" 
+          value={dailySummary ? formatCurrencyCOP(dailySummary.memberShare) : formatCurrencyCOP(0)}
+          icon={Users}
+          description="Basado en el total diario bruto"
+        />
       </div>
       
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="font-headline text-xl">
-            Ingresos de los Últimos 7 Días
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="h-80">
-          <WeeklyRevenueChart entries={entries} />
-        </CardContent>
-      </Card>
-
-
-      {dailySummary ? (
-        <Card className="shadow-lg">
+       <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="shadow-lg lg:col-span-3">
           <CardHeader>
             <CardTitle className="font-headline text-xl">
-              Detalle de Ingresos del {selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd')) : ''}
+              Ingresos de los Últimos 7 Días
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="h-80 pl-2">
+            <WeeklyRevenueChart entries={entries} />
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="font-headline text-xl">
+              Detalle del {selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd')) : ''}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {LOCATION_IDS.map(locId => (
-                <div key={locId} className="flex items-center justify-between p-3 bg-card rounded-lg border">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    <span className="font-medium">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
-                  </div>
-                  <span className="font-semibold text-lg">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
+             {dailySummary ? (
+                <div className="space-y-4">
+                  {LOCATION_IDS.map(locId => (
+                    <div key={locId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-background rounded-md">
+                           <MapPin className="h-5 w-5 text-primary" />
+                        </div>
+                        <span className="font-medium text-foreground">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
+                      </div>
+                      <span className="font-semibold text-lg text-foreground">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              ) : (
+                <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No se encontraron ingresos para la fecha seleccionada.</p>
+                    <Link href="/entry" passHref>
+                      <Button variant="outline">
+                        <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
+                      </Button>
+                    </Link>
+                </div>
+              )}
           </CardContent>
         </Card>
-      ) : (
-        <Card className="shadow-lg text-center">
-          <CardHeader>
-            <CardTitle className="font-headline text-xl">
-              Sin Datos para el {selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd')) : ''}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">No se encontraron ingresos registrados para la fecha seleccionada.</p>
-            <Link href="/entry" passHref>
-              <Button variant="default">
-                <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+      </div>
       
       <div className="mt-8 text-center">
         <Link href="/entry" passHref>
-          <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-            <Edit3 className="mr-2 h-5 w-5" /> Ir a Registrar Nuevos Ingresos
+          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Edit3 className="mr-2 h-5 w-5" /> Registrar Nuevos Ingresos
           </Button>
         </Link>
       </div>
