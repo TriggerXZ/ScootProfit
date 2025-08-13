@@ -13,7 +13,7 @@ import { DatePicker } from '@/components/ui/DatePicker';
 import { LOCATIONS, LOCATION_IDS, LocationId } from '@/lib/constants';
 import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Coins } from 'lucide-react';
 
@@ -117,20 +117,29 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
       la78: parseInputValue(data.la78),
     };
     
+    const isEditing = !!editingEntry;
+    
     onSubmitSuccess(dateString, revenues);
 
     toast({
-      title: editingEntry ? "Ingreso Actualizado" : "Ingreso Guardado",
+      title: isEditing ? "Ingreso Actualizado" : "Ingreso Guardado",
       description: `Los ingresos para ${format(data.date, 'PPP', { locale: es })} han sido guardados.`,
     });
     
-    reset({
-        date: new Date(),
-        la72: "0",
-        elCubo: "0",
-        parqueDeLasLuces: "0",
-        la78: "0",
-    });
+    if (isEditing) {
+        onCancelEdit(); // This will clear the editing state
+    } else {
+        // Not editing, reset form and advance date
+        const nextDay = addDays(data.date, 1);
+        setSelectedDate(nextDay);
+        reset({
+            date: nextDay,
+            la72: "0",
+            elCubo: "0",
+            parqueDeLasLuces: "0",
+            la78: "0",
+        });
+    }
   };
 
   return (
