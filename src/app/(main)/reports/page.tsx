@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { FileDown, FileText } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
-import { NUMBER_OF_MEMBERS } from '@/lib/constants';
+import { DEFAULT_NUMBER_OF_MEMBERS } from '@/lib/constants';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -167,7 +167,7 @@ export default function ReportsPage() {
             </tr>
             <tr style="background-color: #f9f9f9;">
               <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">5. Número de Miembros Participantes:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${NUMBER_OF_MEMBERS}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${DEFAULT_NUMBER_OF_MEMBERS}</td>
             </tr>
             <tr>
               <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
@@ -238,5 +238,7 @@ export default function ReportsPage() {
   );
 }
 
+
+    
 
     

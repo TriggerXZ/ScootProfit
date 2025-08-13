@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Brain, Settings } from 'lucide-react'; // Settings for future use
+import { Home, Edit3, BarChart3, Brain, Settings } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/entry', label: 'Registrar Ingresos', icon: Edit3 },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/predictions', label: 'Predicciones', icon: Brain },
+  { href: '/settings', label: 'Configuración', icon: Settings },
 ];
 
 export function SidebarNav() {

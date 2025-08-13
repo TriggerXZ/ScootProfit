@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 
 export default function DashboardPage() {
   const { entries, isLoading, getDailySummary, allMonthlyTotals, refreshEntries } = useRevenueEntries();
@@ -38,8 +39,7 @@ export default function DashboardPage() {
   }, [refreshEntries]);
 
   const currentMonthTotal = React.useMemo(() => {
-    const currentMonthStr = format(new Date(), 'MMMM yyyy', { locale: es });
-    const monthData = allMonthlyTotals().find(m => m.period === currentMonthStr);
+    const monthData = allMonthlyTotals()[0]; // The totals are sorted descending, so the first one is the most recent
     return monthData ? monthData.totalRevenueInPeriod : 0;
   }, [allMonthlyTotals]);
 
@@ -74,9 +74,9 @@ export default function DashboardPage() {
           <Skeleton className="h-10 w-1/4" />
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
         </div>
-        <Skeleton className="h-64 rounded-lg" />
+        <Skeleton className="h-80 rounded-lg" />
       </div>
     );
   }
@@ -106,10 +106,10 @@ export default function DashboardPage() {
           description="Basado en el total diario bruto"
         />
          <StatCard 
-          title="Total Mes Actual" 
+          title="Total Período Actual (28 días)" 
           value={formatCurrencyCOP(currentMonthTotal)}
           icon={Calendar}
-          description="Ingresos acumulados este mes"
+          description="Ingresos del último período"
         />
         <StatCard 
           title="Promedio Diario (Hist.)" 
@@ -118,6 +118,18 @@ export default function DashboardPage() {
           description="Promedio de todos los registros"
         />
       </div>
+      
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="font-headline text-xl">
+            Ingresos de los Últimos 7 Días
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-80">
+          <WeeklyRevenueChart entries={entries} />
+        </CardContent>
+      </Card>
+
 
       {dailySummary ? (
         <Card className="shadow-lg">

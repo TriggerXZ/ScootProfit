@@ -10,9 +10,10 @@ export type LocationId = keyof typeof LOCATIONS extends infer T ? T extends stri
 
 export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as LocationId[];
 
-export const NUMBER_OF_MEMBERS = 20;
+export const DEFAULT_NUMBER_OF_MEMBERS = 20;
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
+export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';
 
 // Deducciones FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
 // Para obtener el costo total mensual del negocio para cada categoría, multiplicar por NUMBER_OF_MEMBERS.

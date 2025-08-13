@@ -1,7 +1,8 @@
 
 import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue } from '@/types';
 import { 
-  NUMBER_OF_MEMBERS, 
+  DEFAULT_NUMBER_OF_MEMBERS,
+  LOCAL_STORAGE_SETTINGS_KEY,
   LOCATION_IDS, 
   LocationId,
   DEDUCTION_ZONA_SEGURA_PER_MEMBER,
@@ -24,6 +25,25 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+function getNumberOfMembers(): number {
+  if (typeof window === 'undefined') {
+    return DEFAULT_NUMBER_OF_MEMBERS;
+  }
+  const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
+  if (storedSettings) {
+    try {
+      const parsed = JSON.parse(storedSettings);
+      if (parsed.numberOfMembers && typeof parsed.numberOfMembers === 'number' && parsed.numberOfMembers > 0) {
+        return parsed.numberOfMembers;
+      }
+    } catch (e) {
+      return DEFAULT_NUMBER_OF_MEMBERS;
+    }
+  }
+  return DEFAULT_NUMBER_OF_MEMBERS;
+}
+
+
 /**
  * Determines which group was assigned to a specific location on a given date.
  */
@@ -43,10 +63,11 @@ export function getGroupForLocationOnDate(locationId: LocationId, date: Date): G
 
 export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   const total = LOCATION_IDS.reduce((sum, locId) => sum + (entry.revenues[locId] || 0), 0);
+  const numberOfMembers = getNumberOfMembers();
   return {
     date: entry.date,
     total,
-    memberShare: total > 0 && NUMBER_OF_MEMBERS > 0 ? total / NUMBER_OF_MEMBERS : 0,
+    memberShare: total > 0 && numberOfMembers > 0 ? total / numberOfMembers : 0,
     locationTotals: entry.revenues,
   };
 }
@@ -73,6 +94,7 @@ const calculateAggregatedTotals = (
   applyDeductionsForThisPeriod: boolean
 ): AggregatedTotal => {
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
+  const numberOfMembers = getNumberOfMembers();
 
   const groupRevenueTotals: GroupRevenue = { grupoCubo: 0, grupoLuces: 0, grupo78: 0, grupo72: 0 };
   periodEntries.forEach(entry => {
@@ -83,16 +105,16 @@ const calculateAggregatedTotals = (
     });
   });
 
-  const grossMemberShare = totalRevenueInPeriod > 0 && NUMBER_OF_MEMBERS > 0 
-    ? totalRevenueInPeriod / NUMBER_OF_MEMBERS 
+  const grossMemberShare = totalRevenueInPeriod > 0 && numberOfMembers > 0 
+    ? totalRevenueInPeriod / numberOfMembers 
     : 0;
 
   let deductionsDetail: DeductionsDetail;
 
-  if (applyDeductionsForThisPeriod && NUMBER_OF_MEMBERS > 0) {
-    const totalZonaSegura = DEDUCTION_ZONA_SEGURA_PER_MEMBER * NUMBER_OF_MEMBERS;
-    const totalArriendo = DEDUCTION_ARRIENDO_PER_MEMBER * NUMBER_OF_MEMBERS;
-    const totalAporteCooperativa = DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER * NUMBER_OF_MEMBERS;
+  if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
+    const totalZonaSegura = DEDUCTION_ZONA_SEGURA_PER_MEMBER * numberOfMembers;
+    const totalArriendo = DEDUCTION_ARRIENDO_PER_MEMBER * numberOfMembers;
+    const totalAporteCooperativa = DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER * numberOfMembers;
     deductionsDetail = {
       zonaSegura: totalZonaSegura,
       arriendo: totalArriendo,
@@ -110,8 +132,8 @@ const calculateAggregatedTotals = (
 
   const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
 
-  const netMemberShare = NUMBER_OF_MEMBERS > 0 
-    ? netRevenueToDistribute / NUMBER_OF_MEMBERS 
+  const netMemberShare = numberOfMembers > 0 
+    ? netRevenueToDistribute / numberOfMembers 
     : 0;
 
 

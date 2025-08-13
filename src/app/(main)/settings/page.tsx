@@ -1,0 +1,96 @@
+
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { Settings } from 'lucide-react';
+import { LOCAL_STORAGE_SETTINGS_KEY, DEFAULT_NUMBER_OF_MEMBERS } from '@/lib/constants';
+
+const settingsSchema = z.object({
+  numberOfMembers: z.number().int().positive("El número debe ser un entero positivo."),
+});
+
+type SettingsFormValues = z.infer<typeof settingsSchema>;
+
+export default function SettingsPage() {
+  const { toast } = useToast();
+  const [currentSettings, setCurrentSettings] = useState({
+    numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
+  });
+
+  const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SettingsFormValues>({
+    resolver: zodResolver(settingsSchema),
+    defaultValues: currentSettings,
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
+      if (storedSettings) {
+        const parsedSettings = JSON.parse(storedSettings);
+        setCurrentSettings(parsedSettings);
+        reset(parsedSettings);
+      }
+    }
+  }, [reset]);
+
+  const processSubmit = (data: SettingsFormValues) => {
+    localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(data));
+    setCurrentSettings(data);
+    toast({
+      title: "Configuración Guardada",
+      description: "Los cambios han sido guardados exitosamente. Es posible que necesites recargar la página para que se apliquen en todos los cálculos.",
+    });
+  };
+
+  return (
+    <div className="container mx-auto py-8">
+      <Card className="w-full max-w-2xl mx-auto shadow-xl">
+        <CardHeader>
+           <div className="flex items-center gap-2">
+            <Settings className="h-7 w-7 text-primary" />
+            <CardTitle className="font-headline text-2xl">Configuración</CardTitle>
+          </div>
+          <CardDescription>Ajusta los parámetros de la aplicación.</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleSubmit(processSubmit)}>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="numberOfMembers">Número de Miembros</Label>
+              <Controller
+                name="numberOfMembers"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    id="numberOfMembers"
+                    type="number"
+                    placeholder="Escribe el número total de miembros"
+                    onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
+                    className="text-lg"
+                  />
+                )}
+              />
+              {errors.numberOfMembers && <p className="text-sm text-destructive">{errors.numberOfMembers.message}</p>}
+              <p className="text-xs text-muted-foreground mt-1">
+                Este valor se usa para calcular la cuota por miembro en los reportes.
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" disabled={isSubmitting}>
+              {isSubmitting ? "Guardando..." : "Guardar Configuración"}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
+  );
+}
