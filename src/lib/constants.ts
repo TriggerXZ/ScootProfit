@@ -11,7 +11,7 @@ export type LocationId = keyof typeof LOCATIONS extends infer T ? T extends stri
 export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as LocationId[];
 
 export const DEFAULT_NUMBER_OF_MEMBERS = 20;
-export const DEFAULT_MONTHLY_GOAL = 30000000; // Default goal of 30 million COP
+export const DEFAULT_MONTHLY_GOAL = 120000000; // Default goal of 120 million COP
 export const WEEKLY_GOAL = 25000000; // Weekly goal of 25 million COP
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
