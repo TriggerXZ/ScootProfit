@@ -83,7 +83,7 @@ export function GoalProgressCard({ currentPeriod }: GoalProgressCardProps) {
         <div className="space-y-2">
             <Progress value={progressPercentage} className="h-3 [&>div]:bg-green-500" />
             <div className="flex justify-between text-sm font-medium">
-                <span className={`font-bold ${isGoalMet ? 'text-green-400' : 'text-red-400'}`}>{formatCurrencyCOP(totalRevenueInPeriod)}</span>
+                <span className={`font-bold ${isGoalMet ? 'text-green-400' : 'text-foreground'}`}>{formatCurrencyCOP(totalRevenueInPeriod)}</span>
                 <span className="text-muted-foreground">{formatCurrencyCOP(monthlyGoal)}</span>
             </div>
              <div className="flex justify-between text-xs text-muted-foreground">

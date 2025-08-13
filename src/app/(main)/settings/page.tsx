@@ -11,11 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Settings } from 'lucide-react';
-import { LOCAL_STORAGE_SETTINGS_KEY, DEFAULT_NUMBER_OF_MEMBERS, DEFAULT_MONTHLY_GOAL } from '@/lib/constants';
+import { LOCAL_STORAGE_SETTINGS_KEY, DEFAULT_NUMBER_OF_MEMBERS, DEFAULT_MONTHLY_GOAL, DEFAULT_WEEKLY_GOAL } from '@/lib/constants';
 
 const settingsSchema = z.object({
   numberOfMembers: z.number().int().positive("El número debe ser un entero positivo."),
   monthlyGoal: z.number().int().positive("La meta debe ser un número positivo."),
+  weeklyGoal: z.number().int().positive("La meta debe ser un número positivo."),
 });
 
 type SettingsFormValues = z.infer<typeof settingsSchema>;
@@ -25,6 +26,7 @@ export default function SettingsPage() {
   const [currentSettings, setCurrentSettings] = useState({
     numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
     monthlyGoal: DEFAULT_MONTHLY_GOAL,
+    weeklyGoal: DEFAULT_WEEKLY_GOAL,
   });
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SettingsFormValues>({
@@ -41,6 +43,7 @@ export default function SettingsPage() {
         const mergedSettings = {
             numberOfMembers: parsedSettings.numberOfMembers || DEFAULT_NUMBER_OF_MEMBERS,
             monthlyGoal: parsedSettings.monthlyGoal || DEFAULT_MONTHLY_GOAL,
+            weeklyGoal: parsedSettings.weeklyGoal || DEFAULT_WEEKLY_GOAL,
         };
 
         setCurrentSettings(mergedSettings);
@@ -49,6 +52,7 @@ export default function SettingsPage() {
         reset({
             numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
             monthlyGoal: DEFAULT_MONTHLY_GOAL,
+            weeklyGoal: DEFAULT_WEEKLY_GOAL,
         });
       }
     }
@@ -83,10 +87,10 @@ export default function SettingsPage() {
             <Settings className="h-7 w-7 text-primary" />
             <CardTitle className="font-headline text-2xl">Configuración</CardTitle>
           </div>
-          <CardDescription>Ajusta los parámetros globales de la aplicación.</CardDescription>
+          <CardDescription>Ajusta los parámetros globales y las metas de la aplicación.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit(processSubmit)}>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-8">
             <div className="space-y-2">
               <Label htmlFor="numberOfMembers">Número de Miembros</Label>
               <Controller
@@ -109,6 +113,29 @@ export default function SettingsPage() {
               </p>
             </div>
             
+            <div className="space-y-2">
+              <Label htmlFor="weeklyGoal">Meta de Ingresos Semanal</Label>
+               <Controller
+                name="weeklyGoal"
+                control={control}
+                render={({ field }) => (
+                  <Input
+                    id="weeklyGoal"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Escribe la meta semanal"
+                    value={formatCurrencyForInput(field.value)}
+                    onChange={(e) => field.onChange(parseCurrencyFromInput(e.target.value))}
+                    className="text-lg"
+                  />
+                )}
+              />
+              {errors.weeklyGoal && <p className="text-sm text-destructive">{errors.weeklyGoal.message}</p>}
+              <p className="text-xs text-muted-foreground mt-1">
+                Meta para los reportes semanales.
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="monthlyGoal">Meta de Ingresos (Período de 28 días)</Label>
                <Controller

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { AggregatedTotal } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -15,10 +15,11 @@ import {
   DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
   GROUPS,
   GROUP_IDS,
-  WEEKLY_GOAL,
+  LOCAL_STORAGE_SETTINGS_KEY,
+  DEFAULT_WEEKLY_GOAL,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Banknote, Group, BadgePercent, TrendingUp, TrendingDown as TrendingDownIcon } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Group, TrendingUp, TrendingDown as TrendingDownIcon } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -27,7 +28,39 @@ interface AggregatedSummarySectionProps {
   onDownloadInvoice: (item: AggregatedTotal) => void;
 }
 
+function getWeeklyGoalFromSettings(): number {
+    if (typeof window === 'undefined') {
+        return DEFAULT_WEEKLY_GOAL;
+    }
+    const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
+    if (storedSettings) {
+        try {
+            const parsed = JSON.parse(storedSettings);
+            return parsed.weeklyGoal || DEFAULT_WEEKLY_GOAL;
+        } catch (e) {
+            return DEFAULT_WEEKLY_GOAL;
+        }
+    }
+    return DEFAULT_WEEKLY_GOAL;
+}
+
+
 export function AggregatedSummarySection({ title, totals, isLoading, onDownloadInvoice }: AggregatedSummarySectionProps) {
+  const [weeklyGoal, setWeeklyGoal] = useState(DEFAULT_WEEKLY_GOAL);
+
+  useEffect(() => {
+    setWeeklyGoal(getWeeklyGoalFromSettings());
+    
+    const handleStorageChange = () => {
+        setWeeklyGoal(getWeeklyGoalFromSettings());
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+  
   if (isLoading) {
     return (
       <Card>
@@ -69,7 +102,9 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
-            const isWeeklyGoalMet = item.totalRevenueInPeriod >= WEEKLY_GOAL;
+            // Determine if the goal is met only for weekly reports
+            const isWeeklyReport = title.toLowerCase().includes('semanal');
+            const isGoalMet = isWeeklyReport ? item.totalRevenueInPeriod >= weeklyGoal : true;
 
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
@@ -80,8 +115,8 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <span className="text-left">{item.period}</span>
                     </span>
                     <div className="text-right">
-                      <div className={`text-xl font-semibold flex items-center justify-end ${isWeeklyGoalMet ? 'text-green-500' : 'text-red-500'}`}>
-                         {isWeeklyGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDownIcon className="mr-1 h-5 w-5" />}
+                      <div className={`text-xl font-semibold flex items-center justify-end ${isWeeklyReport ? (isGoalMet ? 'text-green-500' : 'text-red-500') : 'text-foreground'}`}>
+                         {isWeeklyReport && (isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDownIcon className="mr-1 h-5 w-5" />)}
                         {formatCurrencyCOP(item.totalRevenueInPeriod)}
                       </div>
                       <div className="text-xs text-muted-foreground">Ingresos Totales del Periodo</div>
