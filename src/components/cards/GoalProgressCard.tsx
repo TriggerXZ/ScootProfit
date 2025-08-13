@@ -68,6 +68,7 @@ export function GoalProgressCard({ currentPeriod }: GoalProgressCardProps) {
   const { totalRevenueInPeriod } = currentPeriod;
   const { monthlyGoal } = settings;
   const progressPercentage = monthlyGoal > 0 ? (totalRevenueInPeriod / monthlyGoal) * 100 : 0;
+  const isGoalMet = totalRevenueInPeriod >= monthlyGoal;
   
   return (
     <Card className="shadow-lg">
@@ -80,12 +81,12 @@ export function GoalProgressCard({ currentPeriod }: GoalProgressCardProps) {
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-            <Progress value={progressPercentage} className="h-3" />
-            <div className="flex justify-between text-sm font-medium text-muted-foreground">
-                <span className="text-foreground font-bold">{formatCurrencyCOP(totalRevenueInPeriod)}</span>
-                <span className="text-primary">{formatCurrencyCOP(monthlyGoal)}</span>
+            <Progress value={progressPercentage} className="h-3 [&>div]:bg-green-500" />
+            <div className="flex justify-between text-sm font-medium">
+                <span className={`font-bold ${isGoalMet ? 'text-green-400' : 'text-red-400'}`}>{formatCurrencyCOP(totalRevenueInPeriod)}</span>
+                <span className="text-muted-foreground">{formatCurrencyCOP(monthlyGoal)}</span>
             </div>
-             <div className="flex justify-between text-xs">
+             <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Alcanzado</span>
                 <span>Meta</span>
             </div>

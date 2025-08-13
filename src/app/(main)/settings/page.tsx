@@ -60,6 +60,8 @@ export default function SettingsPage() {
     toast({
       title: "Configuración Guardada",
       description: "Los cambios han sido guardados exitosamente. Es posible que necesites recargar la página para que se apliquen en todos los cálculos.",
+      variant: 'default',
+      className: 'bg-green-500 text-white'
     });
   };
 
@@ -75,9 +77,9 @@ export default function SettingsPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <Card className="w-full max-w-2xl mx-auto shadow-xl">
+      <Card className="w-full max-w-2xl mx-auto shadow-xl border-border">
         <CardHeader>
-           <div className="flex items-center gap-2">
+           <div className="flex items-center gap-3">
             <Settings className="h-7 w-7 text-primary" />
             <CardTitle className="font-headline text-2xl">Configuración</CardTitle>
           </div>
@@ -131,7 +133,7 @@ export default function SettingsPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" disabled={isSubmitting}>
+            <Button type="submit" className="w-full text-lg py-6" disabled={isSubmitting}>
               {isSubmitting ? "Guardando..." : "Guardar Configuración"}
             </Button>
           </CardFooter>

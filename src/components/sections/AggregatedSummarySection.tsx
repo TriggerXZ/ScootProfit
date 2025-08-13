@@ -14,10 +14,11 @@ import {
   DEDUCTION_ARRIENDO_PER_MEMBER,
   DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
   GROUPS,
-  GROUP_IDS
+  GROUP_IDS,
+  WEEKLY_GOAL,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Banknote, Group, BadgePercent } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Banknote, Group, BadgePercent, TrendingUp, TrendingDown as TrendingDownIcon } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -68,6 +69,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
+            const isWeeklyGoalMet = item.totalRevenueInPeriod >= WEEKLY_GOAL;
 
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
@@ -78,8 +80,8 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <span className="text-left">{item.period}</span>
                     </span>
                     <div className="text-right">
-                      <div className="text-xl font-semibold text-foreground flex items-center justify-end">
-                         <Banknote className="mr-1 h-5 w-5 text-green-500" />
+                      <div className={`text-xl font-semibold flex items-center justify-end ${isWeeklyGoalMet ? 'text-green-500' : 'text-red-500'}`}>
+                         {isWeeklyGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDownIcon className="mr-1 h-5 w-5" />}
                         {formatCurrencyCOP(item.totalRevenueInPeriod)}
                       </div>
                       <div className="text-xs text-muted-foreground">Ingresos Totales del Periodo</div>
