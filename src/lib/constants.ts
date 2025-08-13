@@ -34,8 +34,8 @@ export type GroupId = keyof typeof GROUPS extends infer T ? T extends string ? t
 export const GROUP_IDS = Object.values(GROUPS).map(g => g.id) as GroupId[];
 
 // The date when the rotation schedule began.
-// IMPORTANT: This should be a Monday, as date-fns weeks start on Monday by default for diff calculations.
-export const ROTATION_START_DATE = '2024-06-03';
+// IMPORTANT: This should be a Tuesday, as the business weeks start on Tuesdays.
+export const ROTATION_START_DATE = '2024-06-04';
 
 // Initial assignment of groups to locations for the week of ROTATION_START_DATE.
 // The order of locations here MUST match LOCATION_IDS for the rotation logic to work.
