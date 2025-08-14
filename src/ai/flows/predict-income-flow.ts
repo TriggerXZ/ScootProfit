@@ -9,10 +9,10 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit/zod';
+import { z } from 'zod';
 
 // Input schema for the income prediction flow.
-export const PredictMonthlyIncomeInputSchema = z.object({
+const PredictMonthlyIncomeInputSchema = z.object({
   pastIncome: z.string().describe(
     'A comma-separated string of past monthly income data. Each entry should be in the format "Period Label:Amount". ' +
     'Example: "Periodo del 4 jun al 1 jul 2024:115000000,Periodo del 2 jul al 29 jul 2024:125000000"'
@@ -21,7 +21,7 @@ export const PredictMonthlyIncomeInputSchema = z.object({
 export type PredictMonthlyIncomeInput = z.infer<typeof PredictMonthlyIncomeInputSchema>;
 
 // Output schema for the income prediction flow.
-export const PredictMonthlyIncomeOutputSchema = z.object({
+const PredictMonthlyIncomeOutputSchema = z.object({
   estimatedIncome: z.number().describe('The estimated income for the next 28-day period, in Colombian Pesos.'),
   analysis: z.string().describe('A brief analysis of the prediction, mentioning trends, seasonality, or confidence level.'),
 });
