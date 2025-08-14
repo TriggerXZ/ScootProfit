@@ -10,18 +10,22 @@ export type LocationId = keyof typeof LOCATIONS extends infer T ? T extends stri
 
 export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as LocationId[];
 
+export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
+export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';
+
+
+// --- DEFAULT VALUES ---
+// These are used as fallbacks if no custom settings are found in localStorage.
+
 export const DEFAULT_NUMBER_OF_MEMBERS = 20;
 export const DEFAULT_MONTHLY_GOAL = 120000000; // Default goal of 120 million COP
 export const DEFAULT_WEEKLY_GOAL = 25000000; // Default goal of 25 million COP
 
-export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
-export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';
+// Default Deductions FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
+export const DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER = 20000;
+export const DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER = 299000;
+export const DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER = 72000;
 
-// Deducciones FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
-// Para obtener el costo total mensual del negocio para cada categoría, multiplicar por NUMBER_OF_MEMBERS.
-export const DEDUCTION_ZONA_SEGURA_PER_MEMBER = 20000; // Contribución por miembro al costo de Zona Segura
-export const DEDUCTION_ARRIENDO_PER_MEMBER = 299000; // Contribución por miembro al costo de Arriendo
-export const DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER = 72000; // Contribución por miembro al Aporte Cooperativa
 
 // --- Group Rotation Constants ---
 

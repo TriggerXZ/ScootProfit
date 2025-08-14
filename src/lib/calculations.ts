@@ -5,9 +5,9 @@ import {
   LOCAL_STORAGE_SETTINGS_KEY,
   LOCATION_IDS, 
   LocationId,
-  DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-  DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
+  DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
+  DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
+  DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
   ROTATION_START_DATE,
   INITIAL_ROTATION_ASSIGNMENT,
 } from './constants';
@@ -24,28 +24,46 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+
+interface AppSettings {
+  numberOfMembers: number;
+  zonaSeguraDeduction: number;
+  arriendoDeduction: number;
+  cooperativaDeduction: number;
+}
 /**
- * Retrieves the configured number of members from localStorage,
- * falling back to the default if not set.
- * @returns The number of members.
+ * Retrieves all configured settings from localStorage,
+ * falling back to defaults if not set.
+ * @returns An object with all relevant settings.
  */
-function getNumberOfMembers(): number {
+function getAppSettings(): AppSettings {
+  const defaults = {
+    numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
+    zonaSeguraDeduction: DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
+    arriendoDeduction: DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
+    cooperativaDeduction: DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
+  };
+
   if (typeof window === 'undefined') {
-    return DEFAULT_NUMBER_OF_MEMBERS;
+    return defaults;
   }
+
   const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
   if (storedSettings) {
     try {
       const parsed = JSON.parse(storedSettings);
-      if (parsed.numberOfMembers && typeof parsed.numberOfMembers === 'number' && parsed.numberOfMembers > 0) {
-        return parsed.numberOfMembers;
-      }
+      return {
+        numberOfMembers: parsed.numberOfMembers > 0 ? parsed.numberOfMembers : defaults.numberOfMembers,
+        zonaSeguraDeduction: parsed.zonaSeguraDeduction ?? defaults.zonaSeguraDeduction,
+        arriendoDeduction: parsed.arriendoDeduction ?? defaults.arriendoDeduction,
+        cooperativaDeduction: parsed.cooperativaDeduction ?? defaults.cooperativaDeduction,
+      };
     } catch (e) {
       console.error("Failed to parse settings from localStorage", e);
-      return DEFAULT_NUMBER_OF_MEMBERS;
+      return defaults;
     }
   }
-  return DEFAULT_NUMBER_OF_MEMBERS;
+  return defaults;
 }
 
 
@@ -77,7 +95,7 @@ export function getGroupForLocationOnDate(locationId: LocationId, date: Date): G
  */
 export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
   const total = LOCATION_IDS.reduce((sum, locId) => sum + (entry.revenues[locId] || 0), 0);
-  const numberOfMembers = getNumberOfMembers();
+  const { numberOfMembers } = getAppSettings();
   return {
     date: entry.date,
     total,
@@ -121,7 +139,12 @@ const calculateAggregatedTotals = (
   applyDeductionsForThisPeriod: boolean
 ): AggregatedTotal => {
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
-  const numberOfMembers = getNumberOfMembers();
+  const { 
+    numberOfMembers, 
+    zonaSeguraDeduction, 
+    arriendoDeduction, 
+    cooperativaDeduction 
+  } = getAppSettings();
 
   // Calculate revenue totals per group for the period
   const groupRevenueTotals: GroupRevenue = { grupoCubo: 0, grupoLuces: 0, grupo78: 0, grupo72: 0 };
@@ -141,9 +164,9 @@ const calculateAggregatedTotals = (
 
   // Calculate total business deductions if they apply to this period
   if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
-    const totalZonaSegura = DEDUCTION_ZONA_SEGURA_PER_MEMBER * numberOfMembers;
-    const totalArriendo = DEDUCTION_ARRIENDO_PER_MEMBER * numberOfMembers;
-    const totalAporteCooperativa = DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER * numberOfMembers;
+    const totalZonaSegura = zonaSeguraDeduction * numberOfMembers;
+    const totalArriendo = arriendoDeduction * numberOfMembers;
+    const totalAporteCooperativa = cooperativaDeduction * numberOfMembers;
     deductionsDetail = {
       zonaSegura: totalZonaSegura,
       arriendo: totalArriendo,
