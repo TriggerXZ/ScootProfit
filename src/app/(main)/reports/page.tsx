@@ -50,8 +50,12 @@ export default function ReportsPage() {
     setIsAnalysisLoading(true);
     setShowAnalysisDialog(true);
     try {
-      const groupTotalsString = GROUP_IDS.map(id => `${(GROUPS[id.toUpperCase().replace('GRUPO', 'GRUPO_')] as any).name}: ${formatCurrencyCOP(groupTotals[id] || 0)}`).join(', ');
-      const locationTotalsString = LOCATION_IDS.map(id => `${LOCATIONS[id.toUpperCase() as keyof typeof LOCATIONS].name}: ${formatCurrencyCOP(locationTotals[id] || 0)}`).join(', ');
+      const groupTotalsString = GROUP_IDS.map(id => `${(GROUPS[id.toUpperCase().replace('GRUPO', 'GRUPO_') as keyof typeof GROUPS] as any).name}: ${formatCurrencyCOP(groupTotals[id] || 0)}`).join(', ');
+      const locationTotalsString = LOCATION_IDS.map(id => {
+        const locationName = (Object.values(LOCATIONS).find(l => l.id === id))?.name || id;
+        return `${locationName}: ${formatCurrencyCOP(locationTotals[id] || 0)}`;
+      }).join(', ');
+
 
       if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
         setAnalysisResult({
