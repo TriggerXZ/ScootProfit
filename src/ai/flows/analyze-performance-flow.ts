@@ -15,10 +15,10 @@ import { googleAI } from '@genkit-ai/googleai';
 // Input schema for the performance analysis flow.
 const AnalyzePerformanceInputSchema = z.object({
   locationTotals: z.string().describe(
-    'A comma-separated string of total income per location. Example: "La 72: $10,000,000, El Cubo: $8,000,000"'
+    'Una cadena separada por comas del ingreso total por ubicación. Ejemplo: "La 72: $10,000,000, El Cubo: $8,000,000"'
   ),
   groupTotals: z.string().describe(
-    'A comma-separated string of total income per group. Example: "Grupo Cubo: $9,000,000, Grupo Luces: $9,500,000"'
+    'Una cadena separada por comas del ingreso total por grupo. Ejemplo: "Grupo Cubo: $9,000,000, Grupo Luces: $9,500,000"'
   ),
 });
 export type AnalyzePerformanceInput = z.infer<typeof AnalyzePerformanceInputSchema>;
