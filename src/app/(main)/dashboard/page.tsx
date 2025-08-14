@@ -1,26 +1,40 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/cards/StatCard';
 import { GoalProgressCard } from '@/components/cards/GoalProgressCard';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
-import { calculateDailyTotal } from '@/lib/calculations';
+import { calculateDailyTotal, getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { LOCATIONS, LOCATION_IDS } from '@/lib/constants';
-import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin } from 'lucide-react';
+import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/predict-income-flow';
 
 export default function DashboardPage() {
   const { entries, isLoading, getDailySummary, allMonthlyTotals, refreshEntries } = useRevenueEntries();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
+  const [isPredictionLoading, setIsPredictionLoading] = useState(false);
+  const [predictionResult, setPredictionResult] = useState<PredictMonthlyIncomeOutput | null>(null);
+  const [showPredictionDialog, setShowPredictionDialog] = useState(false);
   
   useEffect(() => {
     // Set initial date on client side to avoid hydration mismatch
@@ -38,7 +52,7 @@ export default function DashboardPage() {
     refreshEntries(); 
   }, [refreshEntries]);
 
-  const { currentMonthData, previousMonthData } = React.useMemo(() => {
+  const { currentMonthData, previousMonthData } = useMemo(() => {
     if (isLoading || entries.length === 0) return { currentMonthData: null, previousMonthData: null };
     const totals = allMonthlyTotals();
     const current = totals.length > 0 ? totals[0] : null;
@@ -47,7 +61,7 @@ export default function DashboardPage() {
   }, [allMonthlyTotals, isLoading, entries]);
 
 
-  const averageDailyRevenue = React.useMemo(() => {
+  const averageDailyRevenue = useMemo(() => {
     if (entries.length === 0) return 0;
     const dailyTotalsMap = new Map<string, { sum: number, count: number }>();
     entries.forEach(entry => {
@@ -69,12 +83,37 @@ export default function DashboardPage() {
     return totalRevenue / dailyTotalsMap.size;
   }, [entries]);
 
-  const percentageChange = React.useMemo(() => {
+  const percentageChange = useMemo(() => {
     if (currentMonthData && previousMonthData && previousMonthData.totalRevenueInPeriod > 0) {
       return ((currentMonthData.totalRevenueInPeriod - previousMonthData.totalRevenueInPeriod) / previousMonthData.totalRevenueInPeriod) * 100;
     }
-    return null;
+    return undefined;
   }, [currentMonthData, previousMonthData]);
+
+  const handlePredictClick = async () => {
+    setIsPredictionLoading(true);
+    setShowPredictionDialog(true);
+    try {
+      const historicalData = getHistoricalMonthlyDataString(entries);
+      if (historicalData.split(',').length < 2) {
+         setPredictionResult({
+          estimatedIncome: 0,
+          analysis: "No hay suficientes datos históricos para realizar una predicción fiable. Se necesitan al menos dos períodos completos de 28 días registrados."
+        });
+        return;
+      }
+      const result = await predictMonthlyIncome({ pastIncome: historicalData });
+      setPredictionResult(result);
+    } catch (error) {
+      console.error("Prediction failed", error);
+      setPredictionResult({
+        estimatedIncome: 0,
+        analysis: "Ocurrió un error al contactar al servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY) en tu proyecto de Netlify o en tu archivo .env.local."
+      });
+    } finally {
+      setIsPredictionLoading(false);
+    }
+  };
 
 
   if (isLoading || selectedDate === undefined) {
@@ -185,16 +224,50 @@ export default function DashboardPage() {
       
       <div className="mt-8 text-center flex gap-4 justify-center">
         <Link href="/entry" passHref>
-          <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Button size="lg" variant="secondary">
             <Edit3 className="mr-2 h-5 w-5" /> Registrar Nuevos Ingresos
           </Button>
         </Link>
-         <Link href="/expenses" passHref>
-          <Button size="lg" variant="secondary">
-             <DollarSign className="mr-2 h-5 w-5" /> Registrar Gastos
+         <Button size="lg" onClick={handlePredictClick}>
+            <BrainCircuit className="mr-2 h-5 w-5" />
+            Obtener Predicción de IA
           </Button>
-        </Link>
       </div>
+
+       <AlertDialog open={showPredictionDialog} onOpenChange={setShowPredictionDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+                <BrainCircuit className="h-6 w-6 text-primary" />
+                Predicción de Ingresos (Próximos 28 días)
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isPredictionLoading
+                ? "Analizando datos históricos y tendencias..."
+                : "La IA ha analizado el historial de ingresos para generar una estimación para el siguiente período."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          
+          {isPredictionLoading ? (
+            <div className="flex justify-center items-center h-24">
+               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            predictionResult && (
+               <div className="my-4">
+                  <p className="text-lg text-muted-foreground">Ingreso Estimado:</p>
+                  <p className="text-4xl font-bold text-primary">{formatCurrencyCOP(predictionResult.estimatedIncome)}</p>
+                  <p className="text-sm text-foreground mt-4 font-semibold">Análisis de la IA:</p>
+                  <p className="text-sm text-muted-foreground">{predictionResult.analysis}</p>
+                </div>
+            )
+          )}
+          
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setShowPredictionDialog(false)}>Entendido</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

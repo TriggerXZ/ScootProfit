@@ -3,14 +3,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, DollarSign } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/entry', label: 'Registrar Ingresos', icon: Edit3 },
-  { href: '/expenses', label: 'Registrar Gastos', icon: DollarSign },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/settings', label: 'Configuración', icon: Settings },
 ];

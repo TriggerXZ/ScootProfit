@@ -10,17 +10,14 @@ import { formatCurrencyCOP } from '@/lib/formatters';
 import { 
   LOCATIONS, 
   LOCATION_IDS, 
-  DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-  DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
   GROUPS,
   GROUP_IDS,
   LOCAL_STORAGE_SETTINGS_KEY,
   DEFAULT_WEEKLY_GOAL,
-  EXPENSE_CATEGORIES,
+  DEFAULT_MONTHLY_GOAL,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Group, TrendingUp, TrendingDown as TrendingDownIcon, Package, Banknote } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, AlertCircle, Group, TrendingUp, TrendingDown, Package, Banknote, Users } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -29,31 +26,34 @@ interface AggregatedSummarySectionProps {
   onDownloadInvoice: (item: AggregatedTotal) => void;
 }
 
-function getWeeklyGoalFromSettings(): number {
+function getGoalsFromSettings(): { weeklyGoal: number, monthlyGoal: number } {
     if (typeof window === 'undefined') {
-        return DEFAULT_WEEKLY_GOAL;
+        return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
     }
     const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
     if (storedSettings) {
         try {
             const parsed = JSON.parse(storedSettings);
-            return parsed.weeklyGoal || DEFAULT_WEEKLY_GOAL;
+            return {
+                weeklyGoal: parsed.weeklyGoal || DEFAULT_WEEKLY_GOAL,
+                monthlyGoal: parsed.monthlyGoal || DEFAULT_MONTHLY_GOAL
+            };
         } catch (e) {
-            return DEFAULT_WEEKLY_GOAL;
+             return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
         }
     }
-    return DEFAULT_WEEKLY_GOAL;
+    return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
 }
 
 
 export function AggregatedSummarySection({ title, totals, isLoading, onDownloadInvoice }: AggregatedSummarySectionProps) {
-  const [weeklyGoal, setWeeklyGoal] = useState(DEFAULT_WEEKLY_GOAL);
+  const [goals, setGoals] = useState({ weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL });
 
   useEffect(() => {
-    setWeeklyGoal(getWeeklyGoalFromSettings());
+    setGoals(getGoalsFromSettings());
     
     const handleStorageChange = () => {
-        setWeeklyGoal(getWeeklyGoalFromSettings());
+        setGoals(getGoalsFromSettings());
     };
 
     window.addEventListener('storage', handleStorageChange);
@@ -102,9 +102,9 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
         <Accordion type="single" collapsible className="w-full" defaultValue="item-0">
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
-            const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
             const isWeeklyReport = title.toLowerCase().includes('semanal');
-            const isGoalMet = isWeeklyReport ? item.totalRevenueInPeriod >= weeklyGoal : true;
+            const goal = isWeeklyReport ? goals.weeklyGoal : goals.monthlyGoal;
+            const isGoalMet = item.totalRevenueInPeriod >= goal;
 
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
@@ -115,8 +115,8 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <span className="text-left">{item.period}</span>
                     </span>
                     <div className="text-right">
-                      <div className={`text-xl font-semibold flex items-center justify-end ${isWeeklyReport ? (isGoalMet ? 'text-green-500' : 'text-red-500') : 'text-foreground'}`}>
-                         {isWeeklyReport && (isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDownIcon className="mr-1 h-5 w-5" />)}
+                      <div className={`text-xl font-semibold flex items-center justify-end ${isGoalMet ? 'text-green-500' : 'text-red-500'}`}>
+                         {isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
                         {formatCurrencyCOP(item.totalRevenueInPeriod)}
                       </div>
                       <div className="text-xs text-muted-foreground">Ingresos Totales del Periodo</div>
@@ -158,7 +158,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                   </div>
 
                   {/* Financial Summary */}
-                  <div className="pt-4 border-t">
+                   <div className="pt-4 border-t">
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
                         {/* Left Column: Gross Figures */}
                         <div className="space-y-3">
@@ -170,17 +170,12 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                                 <span className="font-medium text-foreground">Cuota Bruta Estimada por Miembro:</span>
                                 <span className="text-muted-foreground">{formatCurrencyCOP(item.grossMemberShare)}</span>
                             </div>
-                             <div className="flex justify-between items-center text-red-500">
-                                <span className="font-medium">Total Gastos Variables del Periodo:</span>
-                                <span className="font-semibold">{formatCurrencyCOP(item.variableExpensesTotal)}</span>
-                            </div>
                         </div>
 
                         {/* Right Column: Net Figures */}
-                        {showDeductionsDetails ? (
-                           <div className="space-y-3 p-3 rounded-md bg-card border">
+                         <div className="space-y-3 p-3 rounded-md bg-card border">
                               <div className="flex justify-between items-center">
-                                  <span className="font-medium text-foreground">Ingreso Neto (antes de gastos var.):</span>
+                                  <span className="font-medium text-foreground">Ingreso Neto (después de costos fijos):</span>
                                   <span className={`font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrencyCOP(item.netRevenueToDistribute)}
                                     {item.netRevenueToDistribute < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
@@ -188,71 +183,36 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                               </div>
                               <div className="flex justify-between items-center font-bold text-lg">
                                   <span className="text-primary">Rentabilidad Neta Final del Periodo:</span>
-                                  <span className={`text-primary ${item.finalNetProfit < 0 ? 'text-destructive' : ''}`}>
-                                    {formatCurrencyCOP(item.finalNetProfit)}
+                                  <span className={`text-primary ${item.netRevenueToDistribute < 0 ? 'text-destructive' : ''}`}>
+                                    {formatCurrencyCOP(item.netRevenueToDistribute)}
                                   </span>
                               </div>
                            </div>
-                        ) : (
-                           <div className="space-y-3 p-3 rounded-md bg-card border">
-                               <div className="flex justify-between items-center font-bold text-lg">
-                                 <span className="text-primary">Rentabilidad Neta Final del Periodo:</span>
-                                 <span className={`text-primary ${item.finalNetProfit < 0 ? 'text-destructive' : ''}`}>{formatCurrencyCOP(item.finalNetProfit)}</span>
-                               </div>
-                               <p className="text-xs text-muted-foreground text-center pt-2">No se aplican costos operativos fijos en este período semanal.</p>
-                           </div>
-                        )}
                      </div>
                   </div>
 
                   {/* Deductions & Expenses Details */}
                   <div className="pt-4 border-t grid md:grid-cols-2 gap-8">
-                      {showDeductionsDetails && (
                         <div>
                            <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
                               <TrendingDown className="h-5 w-5 text-destructive" />
-                              Costos Operativos Fijos (Total)
+                              Costos Operativos Fijos
                            </h4>
                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                               <div className="p-3 bg-card rounded-md">
                                 <p className="text-sm text-muted-foreground">Zona Segura</p>
                                 <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</p>
-                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ZONA_SEGURA_PER_MEMBER)}/miembro)</p>
                               </div>
                                <div className="p-3 bg-card rounded-md">
                                 <p className="text-sm text-muted-foreground">Arriendo</p>
                                 <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.arriendo)}</p>
-                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ARRIENDO_PER_MEMBER)}/miembro)</p>
                               </div>
                                <div className="p-3 bg-card rounded-md">
                                 <p className="text-sm text-muted-foreground">Aporte Cooperativa</p>
                                 <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</p>
-                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER)}/miembro)</p>
                               </div>
                            </div>
                         </div>
-                      )}
-                       {item.expenses.length > 0 && (
-                        <div className={!showDeductionsDetails ? 'md:col-span-2' : ''}>
-                          <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
-                            <Package className="h-5 w-5 text-destructive" />
-                            Gastos Variables Registrados
-                          </h4>
-                          <div className="space-y-2">
-                             {item.expenses.map(expense => (
-                               <div key={expense.id} className="flex justify-between items-center p-2 bg-card rounded-md text-sm">
-                                  <div>
-                                    <p className="font-medium">{expense.description}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {EXPENSE_CATEGORIES.find(c => c.id === expense.categoryId)?.name || 'Sin categoría'}
-                                    </p>
-                                  </div>
-                                  <p className="font-semibold text-destructive">{formatCurrencyCOP(expense.amount)}</p>
-                               </div>
-                             ))}
-                          </div>
-                        </div>
-                       )}
                   </div>
 
 
@@ -263,7 +223,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                           {formatCurrencyCOP(item.netMemberShare)}
                           {item.netMemberShare < 0 && <AlertCircle className="inline ml-2 h-6 w-6" />}
                       </div>
-                       <p className="text-xs text-muted-foreground mt-1">Este es el monto final a liquidar por miembro después de todos los costos.</p>
+                       <p className="text-xs text-muted-foreground mt-1">Este es el monto final a liquidar por miembro después de costos fijos.</p>
                   </div>
 
 
