@@ -17,9 +17,10 @@ import {
   GROUP_IDS,
   LOCAL_STORAGE_SETTINGS_KEY,
   DEFAULT_WEEKLY_GOAL,
+  EXPENSE_CATEGORIES,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Group, TrendingUp, TrendingDown as TrendingDownIcon } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, TrendingDown, AlertCircle, Group, TrendingUp, TrendingDown as TrendingDownIcon, Package, Banknote } from 'lucide-react';
 
 interface AggregatedSummarySectionProps {
   title: string;
@@ -102,7 +103,6 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             const showDeductionsDetails = item.deductionsDetail.totalDeductions > 0;
-            // Determine if the goal is met only for weekly reports
             const isWeeklyReport = title.toLowerCase().includes('semanal');
             const isGoalMet = isWeeklyReport ? item.totalRevenueInPeriod >= weeklyGoal : true;
 
@@ -170,64 +170,102 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                                 <span className="font-medium text-foreground">Cuota Bruta Estimada por Miembro:</span>
                                 <span className="text-muted-foreground">{formatCurrencyCOP(item.grossMemberShare)}</span>
                             </div>
+                             <div className="flex justify-between items-center text-red-500">
+                                <span className="font-medium">Total Gastos Variables del Periodo:</span>
+                                <span className="font-semibold">{formatCurrencyCOP(item.variableExpensesTotal)}</span>
+                            </div>
                         </div>
 
                         {/* Right Column: Net Figures */}
                         {showDeductionsDetails ? (
                            <div className="space-y-3 p-3 rounded-md bg-card border">
                               <div className="flex justify-between items-center">
-                                  <span className="font-medium text-foreground">Ingreso Neto a Distribuir:</span>
+                                  <span className="font-medium text-foreground">Ingreso Neto (antes de gastos var.):</span>
                                   <span className={`font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-green-600'}`}>
                                     {formatCurrencyCOP(item.netRevenueToDistribute)}
                                     {item.netRevenueToDistribute < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
                                   </span>
                               </div>
                               <div className="flex justify-between items-center font-bold text-lg">
-                                  <span className="text-primary">Cuota Neta Final por Miembro:</span>
-                                  <span className={`text-primary ${item.netMemberShare < 0 ? 'text-destructive' : ''}`}>
-                                    {formatCurrencyCOP(item.netMemberShare)}
-                                    {item.netMemberShare < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
+                                  <span className="text-primary">Rentabilidad Neta Final del Periodo:</span>
+                                  <span className={`text-primary ${item.finalNetProfit < 0 ? 'text-destructive' : ''}`}>
+                                    {formatCurrencyCOP(item.finalNetProfit)}
                                   </span>
                               </div>
                            </div>
                         ) : (
                            <div className="space-y-3 p-3 rounded-md bg-card border">
                                <div className="flex justify-between items-center font-bold text-lg">
-                                 <span className="text-primary">Cuota Neta Final por Miembro:</span>
-                                 <span className="text-primary">{formatCurrencyCOP(item.netMemberShare)}</span>
+                                 <span className="text-primary">Rentabilidad Neta Final del Periodo:</span>
+                                 <span className={`text-primary ${item.finalNetProfit < 0 ? 'text-destructive' : ''}`}>{formatCurrencyCOP(item.finalNetProfit)}</span>
                                </div>
-                               <p className="text-xs text-muted-foreground text-center pt-2">No se aplican costos operativos en este período semanal.</p>
+                               <p className="text-xs text-muted-foreground text-center pt-2">No se aplican costos operativos fijos en este período semanal.</p>
                            </div>
                         )}
                      </div>
                   </div>
 
-                  {/* Deductions Details (Conditional) */}
-                  {showDeductionsDetails && (
-                    <div className="pt-4 border-t">
-                       <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
-                          <TrendingDown className="h-5 w-5 text-destructive" />
-                          Costos Operativos del Negocio (Total)
-                       </h4>
-                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                          <div className="p-3 bg-card rounded-md">
-                            <p className="text-sm text-muted-foreground">Zona Segura</p>
-                            <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</p>
-                            <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ZONA_SEGURA_PER_MEMBER)}/miembro)</p>
+                  {/* Deductions & Expenses Details */}
+                  <div className="pt-4 border-t grid md:grid-cols-2 gap-8">
+                      {showDeductionsDetails && (
+                        <div>
+                           <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
+                              <TrendingDown className="h-5 w-5 text-destructive" />
+                              Costos Operativos Fijos (Total)
+                           </h4>
+                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                              <div className="p-3 bg-card rounded-md">
+                                <p className="text-sm text-muted-foreground">Zona Segura</p>
+                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</p>
+                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ZONA_SEGURA_PER_MEMBER)}/miembro)</p>
+                              </div>
+                               <div className="p-3 bg-card rounded-md">
+                                <p className="text-sm text-muted-foreground">Arriendo</p>
+                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.arriendo)}</p>
+                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ARRIENDO_PER_MEMBER)}/miembro)</p>
+                              </div>
+                               <div className="p-3 bg-card rounded-md">
+                                <p className="text-sm text-muted-foreground">Aporte Cooperativa</p>
+                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</p>
+                                <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER)}/miembro)</p>
+                              </div>
+                           </div>
+                        </div>
+                      )}
+                       {item.expenses.length > 0 && (
+                        <div className={!showDeductionsDetails ? 'md:col-span-2' : ''}>
+                          <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
+                            <Package className="h-5 w-5 text-destructive" />
+                            Gastos Variables Registrados
+                          </h4>
+                          <div className="space-y-2">
+                             {item.expenses.map(expense => (
+                               <div key={expense.id} className="flex justify-between items-center p-2 bg-card rounded-md text-sm">
+                                  <div>
+                                    <p className="font-medium">{expense.description}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {EXPENSE_CATEGORIES.find(c => c.id === expense.categoryId)?.name || 'Sin categoría'}
+                                    </p>
+                                  </div>
+                                  <p className="font-semibold text-destructive">{formatCurrencyCOP(expense.amount)}</p>
+                               </div>
+                             ))}
                           </div>
-                           <div className="p-3 bg-card rounded-md">
-                            <p className="text-sm text-muted-foreground">Arriendo</p>
-                            <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.arriendo)}</p>
-                            <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_ARRIENDO_PER_MEMBER)}/miembro)</p>
-                          </div>
-                           <div className="p-3 bg-card rounded-md">
-                            <p className="text-sm text-muted-foreground">Aporte Cooperativa</p>
-                            <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</p>
-                            <p className="text-xs text-muted-foreground">({formatCurrencyCOP(DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER)}/miembro)</p>
-                          </div>
-                       </div>
-                    </div>
-                  )}
+                        </div>
+                       )}
+                  </div>
+
+
+                  {/* Final Net Share */}
+                  <div className="pt-6 border-t mt-4 text-center">
+                      <h4 className="text-lg font-headline text-foreground">Cuota Neta Final por Miembro</h4>
+                      <div className={`text-3xl font-bold mt-2 ${item.netMemberShare < 0 ? 'text-destructive' : 'text-primary'}`}>
+                          {formatCurrencyCOP(item.netMemberShare)}
+                          {item.netMemberShare < 0 && <AlertCircle className="inline ml-2 h-6 w-6" />}
+                      </div>
+                       <p className="text-xs text-muted-foreground mt-1">Este es el monto final a liquidar por miembro después de todos los costos.</p>
+                  </div>
+
 
                   {/* Actions */}
                   <div className="pt-4 border-t flex justify-end">

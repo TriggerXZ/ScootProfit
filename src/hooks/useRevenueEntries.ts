@@ -2,12 +2,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenueInput } from '@/types';
+import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenueInput, Expense } from '@/types';
 import { 
   getRevenueEntries as fetchEntries, 
   addOrUpdateRevenueEntry as saveEntry,
   getRevenueEntryById as fetchEntryById,
-  deleteRevenueEntry as removeEntry
+  deleteRevenueEntry as removeEntry,
+  getExpenses as fetchExpenses,
 } from '@/lib/localStorageStore';
 import { 
   calculateDailyTotal, 
@@ -19,11 +20,13 @@ import { format } from 'date-fns';
 
 export function useRevenueEntries() {
   const [entries, setEntries] = useState<RevenueEntry[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshEntries = useCallback(() => {
     setIsLoading(true);
     setEntries(fetchEntries());
+    setExpenses(fetchExpenses());
     setIsLoading(false);
   }, []);
 
@@ -65,15 +68,16 @@ export function useRevenueEntries() {
   }, [entries]);
 
   const allWeeklyTotals = useCallback((): AggregatedTotal[] => {
-    return getWeeklyTotals(entries);
-  }, [entries]);
+    return getWeeklyTotals(entries, expenses);
+  }, [entries, expenses]);
 
   const allMonthlyTotals = useCallback((): AggregatedTotal[] => {
-    return getMonthlyTotals(entries);
-  }, [entries]);
+    return getMonthlyTotals(entries, expenses);
+  }, [entries, expenses]);
 
   return {
     entries,
+    expenses,
     isLoading,
     addEntry,
     deleteEntry,

@@ -1,5 +1,5 @@
 
-import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue } from '@/types';
+import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue, Expense } from '@/types';
 import { 
   DEFAULT_NUMBER_OF_MEMBERS,
   LOCAL_STORAGE_SETTINGS_KEY,
@@ -22,6 +22,7 @@ import {
   addDays,
   differenceInWeeks,
   add,
+  isWithinInterval,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -112,16 +113,19 @@ export function getEntriesForDate(entries: RevenueEntry[], date: Date): RevenueE
  * Core function to calculate aggregated totals for a given period (weekly or monthly).
  * It calculates gross revenue, applies deductions if specified, and determines net shares.
  * @param periodEntries The revenue entries for the period.
+ * @param periodExpenses The expense entries for the period.
  * @param periodLabel A string label for the period (e.g., "Semana del...").
  * @param applyDeductionsForThisPeriod A boolean indicating if business costs should be deducted for this period.
  * @returns An AggregatedTotal object with a full financial breakdown.
  */
 const calculateAggregatedTotals = (
   periodEntries: RevenueEntry[], 
+  periodExpenses: Expense[],
   periodLabel: string,
   applyDeductionsForThisPeriod: boolean
 ): AggregatedTotal => {
   const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
+  const variableExpensesTotal = periodExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   const numberOfMembers = getNumberOfMembers();
 
   // Calculate revenue totals per group for the period
@@ -161,9 +165,10 @@ const calculateAggregatedTotals = (
   }
 
   const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
+  const finalNetProfit = netRevenueToDistribute - variableExpensesTotal;
 
   const netMemberShare = numberOfMembers > 0 
-    ? netRevenueToDistribute / numberOfMembers 
+    ? finalNetProfit / numberOfMembers 
     : 0;
 
 
@@ -172,12 +177,53 @@ const calculateAggregatedTotals = (
     totalRevenueInPeriod,
     grossMemberShare,
     deductionsDetail,
+    variableExpensesTotal,
     netRevenueToDistribute,
+    finalNetProfit,
     netMemberShare,
     groupRevenueTotals,
     entries: periodEntries,
+    expenses: periodExpenses,
   };
 };
+
+const getPeriodData = (
+  allEntries: RevenueEntry[], 
+  allExpenses: Expense[],
+  getPeriodKey: (date: Date) => string,
+  getPeriodLabel: (date: Date) => string,
+  getPeriodInterval: (date: Date) => Interval,
+  applyDeductionsLogic: (date: Date) => boolean
+): AggregatedTotal[] => {
+  const periodAggregations: { [key: string]: { entries: RevenueEntry[], expenses: Expense[] } } = {};
+
+  allEntries.forEach(entry => {
+    const entryDate = parseISO(entry.date);
+    const periodKey = getPeriodKey(entryDate);
+    if (!periodAggregations[periodKey]) {
+      periodAggregations[periodKey] = { entries: [], expenses: [] };
+    }
+    periodAggregations[periodKey].entries.push(entry);
+  });
+  
+  allExpenses.forEach(expense => {
+    const expenseDate = parseISO(expense.date);
+    const periodKey = getPeriodKey(expenseDate);
+     if (periodAggregations[periodKey]) {
+        periodAggregations[periodKey].expenses.push(expense);
+     }
+  });
+  
+  return Object.keys(periodAggregations).map(periodKey => {
+    const periodStartDateObj = parseISO(periodKey);
+    const { entries, expenses } = periodAggregations[periodKey];
+    const periodLabel = getPeriodLabel(periodStartDateObj);
+    const applyDeductions = applyDeductionsLogic(periodStartDateObj);
+    
+    return calculateAggregatedTotals(entries, expenses, periodLabel, applyDeductions);
+  }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
+};
+
 
 /**
  * Aggregates all revenue entries into weekly totals, starting on Tuesdays.
@@ -185,36 +231,20 @@ const calculateAggregatedTotals = (
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each week.
  */
-export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  const weeklyAggregations: { [weekStart: string]: RevenueEntry[] } = {};
-
-  entries.forEach(entry => {
-    const entryDate = parseISO(entry.date);
-    // Business weeks start on Tuesday (2)
-    const weekStartDateForEntry = startOfWeek(entryDate, { locale: es, weekStartsOn: 2 });
-    const weekStartString = format(weekStartDateForEntry, 'yyyy-MM-dd');
-
-    if (!weeklyAggregations[weekStartString]) {
-      weeklyAggregations[weekStartString] = [];
-    }
-    weeklyAggregations[weekStartString].push(entry);
-  });
+export function getWeeklyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+  const getPeriodKey = (date: Date) => format(startOfWeek(date, { locale: es, weekStartsOn: 2 }), 'yyyy-MM-dd');
+  const getPeriodLabel = (date: Date) => `Semana del ${format(date, 'PPP', { locale: es })}`;
+  const getPeriodInterval = (date: Date) => ({ start: date, end: addDays(date, 6) });
   
-  return Object.entries(weeklyAggregations).map(([weekStart, periodEntries]) => {
-    const currentWeekStartDateObj = parseISO(weekStart);
-    const periodLabel = `Semana del ${format(currentWeekStartDateObj, 'PPP', { locale: es })}`;
-    
-    // Determine if this week starts on the first Tuesday of its month
-    const firstDayOfTheMonthOfThisWeek = startOfMonth(currentWeekStartDateObj);
-    // getDay returns 0 for Sunday, ..., 2 for Tuesday, ..., 6 for Saturday.
+  const applyDeductionsLogic = (date: Date) => {
+    const firstDayOfTheMonthOfThisWeek = startOfMonth(date);
     const dayOfWeekOfFirstDay = getDay(firstDayOfTheMonthOfThisWeek);
     const daysToAddForFirstTuesday = (2 - dayOfWeekOfFirstDay + 7) % 7;
     const firstTuesdayOfThisMonth = addDays(firstDayOfTheMonthOfThisWeek, daysToAddForFirstTuesday);
-    
-    const applyDeductionsThisWeek = isSameDay(currentWeekStartDateObj, firstTuesdayOfThisMonth);
-
-    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductionsThisWeek);
-  }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
+    return isSameDay(date, firstTuesdayOfThisMonth);
+  };
+  
+  return getPeriodData(entries, expenses, getPeriodKey, getPeriodLabel, getPeriodInterval, applyDeductionsLogic);
 }
 
 /**
@@ -223,40 +253,34 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each 28-day period.
  */
-export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  if (entries.length === 0) return [];
+export function getMonthlyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+  if (entries.length === 0 && expenses.length === 0) return [];
   
-  const monthlyAggregations: { [periodKey: string]: RevenueEntry[] } = {};
+  const allDates = [...entries.map(e => e.date), ...expenses.map(e => e.date)];
+  if (allDates.length === 0) return [];
+
+  const sortedDates = allDates.map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
+  const firstEntryDate = sortedDates[0];
   
-  // Sort entries to find the absolute start date
-  const sortedEntries = entries.slice().sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-  const firstEntryDate = parseISO(sortedEntries[0].date);
-  
-  // The first 28-day period starts on the first Tuesday on or before the first entry
   const firstPeriodStartDate = startOfWeek(firstEntryDate, { locale: es, weekStartsOn: 2 });
 
-  sortedEntries.forEach(entry => {
-    const entryDate = parseISO(entry.date);
-    const diffInDays = Math.floor((entryDate.getTime() - firstPeriodStartDate.getTime()) / (1000 * 60 * 60 * 24));
+  const getPeriodKey = (date: Date) => {
+    const diffInDays = Math.floor((date.getTime() - firstPeriodStartDate.getTime()) / (1000 * 60 * 60 * 24));
     const periodIndex = Math.floor(diffInDays / 28);
-    
     const periodStartDate = add(firstPeriodStartDate, { days: periodIndex * 28 });
-    const periodKey = format(periodStartDate, 'yyyy-MM-dd');
+    return format(periodStartDate, 'yyyy-MM-dd');
+  };
 
-    if (!monthlyAggregations[periodKey]) {
-      monthlyAggregations[periodKey] = [];
-    }
-    monthlyAggregations[periodKey].push(entry);
-  });
+  const getPeriodLabel = (date: Date) => {
+    const endDate = add(date, { days: 27 });
+    return `Periodo del ${format(date, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
+  };
+  
+  const getPeriodInterval = (date: Date) => ({ start: date, end: add(date, { days: 27 }) });
 
-  return Object.entries(monthlyAggregations).map(([periodStart, periodEntries]) => {
-    const startDate = parseISO(periodStart);
-    const endDate = add(startDate, { days: 27 });
-    const periodLabel = `Periodo del ${format(startDate, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
-    
-    // Monthly (28-day) periods always have deductions applied
-    return calculateAggregatedTotals(periodEntries, periodLabel, true);
-  }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
+  const applyDeductionsLogic = () => true;
+
+  return getPeriodData(entries, expenses, getPeriodKey, getPeriodLabel, getPeriodInterval, applyDeductionsLogic);
 }
 
 /**
@@ -264,8 +288,8 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
  * @param entries All revenue entries.
  * @returns A comma-separated string of period and total revenue pairs.
  */
-export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = getMonthlyTotals(entries); 
+export function getHistoricalMonthlyDataString(entries: RevenueEntry[], expenses: Expense[]): string {
+  const monthlyTotals = getMonthlyTotals(entries, expenses); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries.reduce((min, p) => (p.date < min ? p.date : min), a.entries[0].date)) : new Date(0);

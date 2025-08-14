@@ -15,6 +15,7 @@ export const DEFAULT_MONTHLY_GOAL = 120000000; // Default goal of 120 million CO
 export const DEFAULT_WEEKLY_GOAL = 25000000; // Default goal of 25 million COP
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
+export const LOCAL_STORAGE_EXPENSE_KEY = 'scootProfitExpenses';
 export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';
 
 // Deducciones FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
@@ -48,3 +49,14 @@ export const INITIAL_ROTATION_ASSIGNMENT: readonly GroupId[] = [
   GROUPS.GRUPO_72.id,       // Assigned to parqueDeLasLuces
   GROUPS.GRUPO_CUBO.id,     // Assigned to la78
 ];
+
+// -- Expense Categories --
+export const EXPENSE_CATEGORIES = [
+  { id: 'reparacion', name: 'Reparación y Mantenimiento' },
+  { id: 'combustible', name: 'Combustible' },
+  { id: 'marketing', name: 'Marketing y Publicidad' },
+  { id: 'administrativo', name: 'Gastos Administrativos' },
+  { id: 'otros', name: 'Otros' },
+] as const;
+
+export type ExpenseCategoryId = typeof EXPENSE_CATEGORIES[number]['id'];

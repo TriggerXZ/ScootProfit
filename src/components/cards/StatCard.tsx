@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
@@ -10,9 +11,11 @@ interface StatCardProps {
   icon?: LucideIcon;
   className?: string;
   valueClassName?: string;
+  percentageChange?: number | null;
 }
 
-export function StatCard({ title, value, description, icon: Icon, className, valueClassName }: StatCardProps) {
+export function StatCard({ title, value, description, icon: Icon, className, valueClassName, percentageChange }: StatCardProps) {
+  const isPositive = percentageChange !== null && percentageChange >= 0;
   return (
     <Card className={cn("shadow-lg hover:shadow-xl transition-shadow duration-300", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -20,8 +23,20 @@ export function StatCard({ title, value, description, icon: Icon, className, val
         {Icon && <Icon className="h-5 w-5 text-muted-foreground" />}
       </CardHeader>
       <CardContent>
-        <div className={cn("text-3xl font-bold font-headline text-foreground", valueClassName)}>{value}</div>
-        {description && <p className="text-xs text-muted-foreground pt-1">{description}</p>}
+        <div className="flex items-baseline gap-2">
+          <div className={cn("text-3xl font-bold font-headline text-foreground", valueClassName)}>{value}</div>
+          {percentageChange !== null && (
+            <div className={cn(
+              "flex items-center text-sm font-semibold",
+              isPositive ? "text-green-500" : "text-red-500"
+            )}>
+              {isPositive ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+              {percentageChange.toFixed(1)}%
+            </div>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground pt-1">{description}</p>
+        {percentageChange !== null && <p className="text-xs text-muted-foreground">vs. período anterior</p>}
       </CardContent>
     </Card>
   );

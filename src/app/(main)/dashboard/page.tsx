@@ -38,10 +38,12 @@ export default function DashboardPage() {
     refreshEntries(); 
   }, [refreshEntries]);
 
-  const currentMonthData = React.useMemo(() => {
-    if (isLoading || entries.length === 0) return null;
+  const { currentMonthData, previousMonthData } = React.useMemo(() => {
+    if (isLoading || entries.length === 0) return { currentMonthData: null, previousMonthData: null };
     const totals = allMonthlyTotals();
-    return totals.length > 0 ? totals[0] : null;
+    const current = totals.length > 0 ? totals[0] : null;
+    const previous = totals.length > 1 ? totals[1] : null;
+    return { currentMonthData: current, previousMonthData: previous };
   }, [allMonthlyTotals, isLoading, entries]);
 
 
@@ -66,6 +68,13 @@ export default function DashboardPage() {
     
     return totalRevenue / dailyTotalsMap.size;
   }, [entries]);
+
+  const percentageChange = React.useMemo(() => {
+    if (currentMonthData && previousMonthData && previousMonthData.totalRevenueInPeriod > 0) {
+      return ((currentMonthData.totalRevenueInPeriod - previousMonthData.totalRevenueInPeriod) / previousMonthData.totalRevenueInPeriod) * 100;
+    }
+    return null;
+  }, [currentMonthData, previousMonthData]);
 
 
   if (isLoading || selectedDate === undefined) {
@@ -102,6 +111,7 @@ export default function DashboardPage() {
           value={formatCurrencyCOP(currentMonthData?.totalRevenueInPeriod ?? 0)}
           icon={Calendar}
           description={currentMonthData?.period ?? "Ingresos del último período"}
+          percentageChange={percentageChange}
         />
         <StatCard 
           title="Promedio Diario (Hist.)" 
@@ -173,10 +183,15 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      <div className="mt-8 text-center">
+      <div className="mt-8 text-center flex gap-4 justify-center">
         <Link href="/entry" passHref>
           <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <Edit3 className="mr-2 h-5 w-5" /> Registrar Nuevos Ingresos
+          </Button>
+        </Link>
+         <Link href="/expenses" passHref>
+          <Button size="lg" variant="secondary">
+             <DollarSign className="mr-2 h-5 w-5" /> Registrar Gastos
           </Button>
         </Link>
       </div>
