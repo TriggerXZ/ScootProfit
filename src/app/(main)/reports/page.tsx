@@ -69,14 +69,18 @@ export default function ReportsPage() {
 
       const result = await analyzePerformance({ groupTotals: groupTotalsString, locationTotals: locationTotalsString });
       setAnalysisResult(result);
-    } catch (error) {
-      console.error("Analysis failed", error);
-      setAnalysisResult({
-        executiveSummary: "Error al realizar el análisis.",
-        positiveObservations: [],
-        areasForImprovement: ["Ocurrió un error al contactar al servicio de IA. Por favor, revisa la configuración de tu API key de Gemini o inténtalo de nuevo más tarde."],
-        recommendations: []
-      });
+    } catch (error: any) {
+        let errorMessage = "Ocurrió un error al contactar al servicio de IA. Por favor, revisa la configuración de tu API key de Gemini o inténtalo de nuevo más tarde.";
+        if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
+            errorMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
+        }
+        console.error("Analysis failed", error);
+        setAnalysisResult({
+            executiveSummary: "Error al realizar el análisis.",
+            positiveObservations: [],
+            areasForImprovement: [errorMessage],
+            recommendations: []
+        });
     } finally {
       setIsAnalysisLoading(false);
     }
@@ -407,3 +411,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
