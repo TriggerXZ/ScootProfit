@@ -10,6 +10,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import { googleAI } from '@genkit-ai/googleai';
 
 // Input schema for the income prediction flow.
 const PredictMonthlyIncomeInputSchema = z.object({
@@ -35,6 +36,7 @@ export async function predictMonthlyIncome(input: PredictMonthlyIncomeInput): Pr
 // Define the Genkit prompt for the AI model.
 const incomePredictionPrompt = ai.definePrompt({
   name: 'incomePredictionPrompt',
+  model: googleAI.model('gemini-1.5-flash-latest'),
   input: { schema: PredictMonthlyIncomeInputSchema },
   output: { schema: PredictMonthlyIncomeOutputSchema },
   prompt: `
