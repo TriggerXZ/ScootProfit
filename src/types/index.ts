@@ -1,4 +1,5 @@
 
+
 export interface LocationRevenueInput {
   la72: string; // Input as string for form handling
   elCubo: string;

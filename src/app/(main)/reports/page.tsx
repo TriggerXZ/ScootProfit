@@ -9,11 +9,13 @@ import { LocationPerformanceChart } from '@/components/charts/LocationPerformanc
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileDown, FileText, BarChart2 } from 'lucide-react';
+import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
-import { DEFAULT_NUMBER_OF_MEMBERS } from '@/lib/constants';
+import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
 import { format } from 'date-fns';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 
 
 export default function ReportsPage() {
@@ -21,6 +23,9 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState('weekly');
   const weeklyReportRef = useRef<HTMLDivElement>(null);
   const monthlyReportRef = useRef<HTMLDivElement>(null);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
   const { groupTotals, locationTotals } = useMemo(() => {
     const allTotals = allMonthlyTotals();
@@ -40,6 +45,38 @@ export default function ReportsPage() {
 
     return { groupTotals: groupMap, locationTotals: locationMap };
   }, [allMonthlyTotals]);
+
+  const handleAnalyzeClick = async () => {
+    setIsAnalysisLoading(true);
+    setShowAnalysisDialog(true);
+    try {
+      const groupTotalsString = GROUP_IDS.map(id => `${(GROUPS[id.toUpperCase().replace('GRUPO', 'GRUPO_')] as any).name}: ${formatCurrencyCOP(groupTotals[id] || 0)}`).join(', ');
+      const locationTotalsString = LOCATION_IDS.map(id => `${LOCATIONS[id.toUpperCase() as keyof typeof LOCATIONS].name}: ${formatCurrencyCOP(locationTotals[id] || 0)}`).join(', ');
+
+      if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
+        setAnalysisResult({
+            executiveSummary: "No hay suficientes datos para un análisis.",
+            positiveObservations: [],
+            areasForImprovement: ["Se necesita al menos un período completo de datos para realizar un análisis significativo."],
+            recommendations: []
+        });
+        return;
+      }
+
+      const result = await analyzePerformance({ groupTotals: groupTotalsString, locationTotals: locationTotalsString });
+      setAnalysisResult(result);
+    } catch (error) {
+      console.error("Analysis failed", error);
+      setAnalysisResult({
+        executiveSummary: "Error al realizar el análisis.",
+        positiveObservations: [],
+        areasForImprovement: ["Ocurrió un error al contactar al servicio de IA. Por favor, revisa la configuración de tu API key de Gemini o inténtalo de nuevo más tarde."],
+        recommendations: []
+      });
+    } finally {
+      setIsAnalysisLoading(false);
+    }
+  };
 
 
   const handleDownloadReportPDF = async () => {
@@ -222,9 +259,15 @@ export default function ReportsPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-           <div className="flex items-center gap-2">
-            <BarChart2 className="h-6 w-6 text-primary" />
-            <CardTitle className="font-headline text-2xl">Análisis de Rendimiento (Histórico)</CardTitle>
+           <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+                <BarChart2 className="h-6 w-6 text-primary" />
+                <CardTitle className="font-headline text-2xl">Análisis de Rendimiento (Histórico)</CardTitle>
+            </div>
+             <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading}>
+                <BrainCircuit className="mr-2 h-4 w-4" />
+                Analizar con IA
+            </Button>
           </div>
           <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación a lo largo del tiempo.</CardDescription>
         </CardHeader>
@@ -275,6 +318,88 @@ export default function ReportsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+       <AlertDialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
+            <AlertDialogContent className="max-w-2xl">
+            <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 font-headline text-2xl">
+                    <BrainCircuit className="h-7 w-7 text-primary" />
+                    Análisis de Rendimiento con IA
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                {isAnalysisLoading
+                    ? "Analizando el rendimiento histórico de tus grupos y ubicaciones..."
+                    : "La IA ha procesado tus datos para generar los siguientes insights:"}
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            
+            {isAnalysisLoading ? (
+                <div className="flex justify-center items-center h-48">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            ) : (
+                analysisResult && (
+                <div className="my-4 text-sm space-y-6 max-h-[60vh] overflow-y-auto pr-2">
+                    <div>
+                        <h3 className="font-semibold text-foreground mb-2">Resumen Ejecutivo</h3>
+                        <p className="text-muted-foreground bg-muted/50 p-3 rounded-md">{analysisResult.executiveSummary}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <CheckCircle className="h-5 w-5 text-green-500" />
+                                Observaciones Positivas
+                            </h3>
+                            <ul className="space-y-2">
+                                {analysisResult.positiveObservations.map((item, index) => (
+                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-green-500/10 text-green-700">
+                                        <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div>
+                             <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                <TrendingDownIcon className="h-5 w-5 text-amber-500" />
+                                Áreas de Mejora
+                            </h3>
+                            <ul className="space-y-2">
+                                {analysisResult.areasForImprovement.map((item, index) => (
+                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-amber-700">
+                                        <TrendingDownIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                                        <span>{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <Lightbulb className="h-5 w-5 text-primary" />
+                            Recomendaciones
+                        </h3>
+                         <ul className="space-y-2">
+                            {analysisResult.recommendations.map((item, index) => (
+                                <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-primary/10 text-primary">
+                                    <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
+                                    <span>{item}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    </div>
+                )
+            )}
+            
+            <AlertDialogFooter>
+                <AlertDialogAction onClick={() => setShowAnalysisDialog(false)}>Entendido</AlertDialogAction>
+            </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
     </div>
   );
 }
