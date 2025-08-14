@@ -84,7 +84,7 @@ export default function DashboardPage() {
   }, [entries]);
 
   const percentageChange = useMemo(() => {
-    if (currentMonthData && previousMonthData && previousMonthData.totalRevenueInPeriod > 0) {
+    if (currentMonthData && previousMonthData && typeof previousMonthData.totalRevenueInPeriod === 'number' && previousMonthData.totalRevenueInPeriod > 0) {
       return ((currentMonthData.totalRevenueInPeriod - previousMonthData.totalRevenueInPeriod) / previousMonthData.totalRevenueInPeriod) * 100;
     }
     return undefined;
@@ -104,11 +104,15 @@ export default function DashboardPage() {
       }
       const result = await predictMonthlyIncome({ pastIncome: historicalData });
       setPredictionResult(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Prediction failed", error);
+      let analysisMessage = "Ocurrió un error al contactar al servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY).";
+      if (error.message && error.message.includes("overloaded")) {
+        analysisMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
+      }
       setPredictionResult({
         estimatedIncome: 0,
-        analysis: "Ocurrió un error al contactar al servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY) en tu proyecto de Netlify o en tu archivo .env.local."
+        analysis: analysisMessage
       });
     } finally {
       setIsPredictionLoading(false);
