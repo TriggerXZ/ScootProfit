@@ -9,13 +9,21 @@ import { LocationPerformanceChart } from '@/components/charts/LocationPerformanc
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle } from 'lucide-react';
+import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
 import { format } from 'date-fns';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
+import { translateText } from '@/ai/flows/translate-text-flow';
+
+type TranslatedAnalysis = {
+    executiveSummary?: string;
+    positiveObservations?: string[];
+    areasForImprovement?: string[];
+    recommendations?: string[];
+};
 
 
 export default function ReportsPage() {
@@ -25,6 +33,8 @@ export default function ReportsPage() {
   const monthlyReportRef = useRef<HTMLDivElement>(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
+  const [translatedAnalysis, setTranslatedAnalysis] = useState<TranslatedAnalysis | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
   const { groupTotals, locationTotals } = useMemo(() => {
@@ -48,6 +58,8 @@ export default function ReportsPage() {
 
   const handleAnalyzeClick = async () => {
     setIsAnalysisLoading(true);
+    setAnalysisResult(null);
+    setTranslatedAnalysis(null);
     setShowAnalysisDialog(true);
     try {
       const groupTotalsString = GROUP_IDS.map(id => `${(GROUPS[id.toUpperCase().replace('GRUPO', 'GRUPO_') as keyof typeof GROUPS] as any).name}: ${formatCurrencyCOP(groupTotals[id] || 0)}`).join(', ');
@@ -59,9 +71,9 @@ export default function ReportsPage() {
 
       if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
         setAnalysisResult({
-            executiveSummary: "No hay suficientes datos para un análisis.",
+            executiveSummary: "Not enough data for an analysis.",
             positiveObservations: [],
-            areasForImprovement: ["Se necesita al menos un período completo de datos para realizar un análisis significativo."],
+            areasForImprovement: ["At least one full period of data is needed to perform a meaningful analysis."],
             recommendations: []
         });
         return;
@@ -70,13 +82,13 @@ export default function ReportsPage() {
       const result = await analyzePerformance({ groupTotals: groupTotalsString, locationTotals: locationTotalsString });
       setAnalysisResult(result);
     } catch (error: any) {
-        let errorMessage = "Ocurrió un error al contactar al servicio de IA. Por favor, revisa la configuración de tu API key de Gemini o inténtalo de nuevo más tarde.";
+        let errorMessage = "An error occurred while contacting the AI service. Please check your Gemini API key configuration or try again later.";
         if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
-            errorMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
+            errorMessage = "The AI model is currently overloaded. Please try again in a few minutes.";
         }
         console.error("Analysis failed", error);
         setAnalysisResult({
-            executiveSummary: "Error al realizar el análisis.",
+            executiveSummary: "Error performing analysis.",
             positiveObservations: [],
             areasForImprovement: [errorMessage],
             recommendations: []
@@ -84,6 +96,34 @@ export default function ReportsPage() {
     } finally {
       setIsAnalysisLoading(false);
     }
+  };
+
+  const handleTranslateAnalysis = async () => {
+      if (!analysisResult) return;
+      setIsTranslating(true);
+      
+      const translate = async (text: string) => (await translateText({ text, targetLanguage: 'Spanish' })).translatedText;
+      const translateArray = (arr: string[]) => Promise.all(arr.map(item => translate(item)));
+
+      try {
+          const [summary, positives, improvements, recs] = await Promise.all([
+              translate(analysisResult.executiveSummary),
+              translateArray(analysisResult.positiveObservations),
+              translateArray(analysisResult.areasForImprovement),
+              translateArray(analysisResult.recommendations)
+          ]);
+          setTranslatedAnalysis({
+              executiveSummary: summary,
+              positiveObservations: positives,
+              areasForImprovement: improvements,
+              recommendations: recs
+          });
+      } catch (error) {
+          console.error("Translation failed", error);
+          setTranslatedAnalysis({ executiveSummary: "La traducción no pudo ser completada." });
+      } finally {
+          setIsTranslating(false);
+      }
   };
 
 
@@ -330,9 +370,23 @@ export default function ReportsPage() {
        <AlertDialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
             <AlertDialogContent className="max-w-2xl">
             <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2 font-headline text-2xl">
-                    <BrainCircuit className="h-7 w-7 text-primary" />
-                    Análisis de Rendimiento con IA
+                <AlertDialogTitle className="flex items-center justify-between font-headline text-2xl">
+                    <div className="flex items-center gap-2">
+                        <BrainCircuit className="h-7 w-7 text-primary" />
+                        Análisis de Rendimiento con IA
+                    </div>
+                     {!translatedAnalysis && !isAnalysisLoading && analysisResult && (
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={handleTranslateAnalysis} 
+                            disabled={isTranslating}
+                            className="text-xs"
+                        >
+                            <Languages className="mr-2 h-4 w-4" />
+                            {isTranslating ? 'Traduciendo...' : 'Traducir'}
+                        </Button>
+                     )}
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                 {isAnalysisLoading
@@ -350,7 +404,9 @@ export default function ReportsPage() {
                 <div className="my-4 text-sm space-y-6 max-h-[60vh] overflow-y-auto pr-2">
                     <div>
                         <h3 className="font-semibold text-foreground mb-2">Resumen Ejecutivo</h3>
-                        <p className="text-muted-foreground bg-muted/50 p-3 rounded-md">{analysisResult.executiveSummary}</p>
+                        <p className="text-muted-foreground bg-muted/50 p-3 rounded-md italic">
+                           {translatedAnalysis?.executiveSummary || analysisResult.executiveSummary}
+                        </p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -360,8 +416,8 @@ export default function ReportsPage() {
                                 Observaciones Positivas
                             </h3>
                             <ul className="space-y-2">
-                                {analysisResult.positiveObservations.map((item, index) => (
-                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-green-500/10 text-green-700">
+                                {(translatedAnalysis?.positiveObservations || analysisResult.positiveObservations).map((item, index) => (
+                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-green-500/10 text-green-700 italic">
                                         <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
                                         <span>{item}</span>
                                     </li>
@@ -374,8 +430,8 @@ export default function ReportsPage() {
                                 Áreas de Mejora
                             </h3>
                             <ul className="space-y-2">
-                                {analysisResult.areasForImprovement.map((item, index) => (
-                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-amber-700">
+                                {(translatedAnalysis?.areasForImprovement || analysisResult.areasForImprovement).map((item, index) => (
+                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-amber-700 italic">
                                         <TrendingDownIcon className="h-4 w-4 mt-0.5 shrink-0" />
                                         <span>{item}</span>
                                     </li>
@@ -390,8 +446,8 @@ export default function ReportsPage() {
                             Recomendaciones
                         </h3>
                          <ul className="space-y-2">
-                            {analysisResult.recommendations.map((item, index) => (
-                                <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-primary/10 text-primary">
+                            {(translatedAnalysis?.recommendations || analysisResult.recommendations).map((item, index) => (
+                                <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-primary/10 text-primary italic">
                                     <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
                                     <span>{item}</span>
                                 </li>

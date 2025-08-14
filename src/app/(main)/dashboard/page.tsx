@@ -10,7 +10,7 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { calculateDailyTotal, getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { LOCATIONS, LOCATION_IDS } from '@/lib/constants';
-import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit } from 'lucide-react';
+import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit, Languages } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/predict-income-flow';
+import { translateText } from '@/ai/flows/translate-text-flow';
 
 export default function DashboardPage() {
   const { entries, isLoading, getDailySummary, allMonthlyTotals, refreshEntries } = useRevenueEntries();
@@ -34,6 +35,8 @@ export default function DashboardPage() {
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
   const [predictionResult, setPredictionResult] = useState<PredictMonthlyIncomeOutput | null>(null);
+  const [translatedPrediction, setTranslatedPrediction] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [showPredictionDialog, setShowPredictionDialog] = useState(false);
   
   useEffect(() => {
@@ -92,13 +95,15 @@ export default function DashboardPage() {
 
   const handlePredictClick = async () => {
     setIsPredictionLoading(true);
+    setPredictionResult(null);
+    setTranslatedPrediction(null);
     setShowPredictionDialog(true);
     try {
       const historicalData = getHistoricalMonthlyDataString(entries);
       if (historicalData.split(',').length < 2) {
          setPredictionResult({
           estimatedIncome: 0,
-          analysis: "No hay suficientes datos históricos para realizar una predicción fiable. Se necesitan al menos dos períodos completos de 28 días registrados."
+          analysis: "Not enough historical data to make a reliable prediction. At least two full 28-day periods are needed."
         });
         return;
       }
@@ -106,9 +111,9 @@ export default function DashboardPage() {
       setPredictionResult(result);
     } catch (error: any) {
       console.error("Prediction failed", error);
-      let analysisMessage = "Ocurrió un error al contactar al servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY).";
+      let analysisMessage = "An error occurred while contacting the AI service. Please ensure your Gemini API key is correctly configured as an environment variable (GEMINI_API_KEY).";
       if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
-        analysisMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
+        analysisMessage = "The AI model is currently overloaded. Please try again in a few minutes.";
       }
       setPredictionResult({
         estimatedIncome: 0,
@@ -116,6 +121,20 @@ export default function DashboardPage() {
       });
     } finally {
       setIsPredictionLoading(false);
+    }
+  };
+  
+  const handleTranslatePrediction = async () => {
+    if (!predictionResult || !predictionResult.analysis) return;
+    setIsTranslating(true);
+    try {
+        const result = await translateText({ text: predictionResult.analysis, targetLanguage: 'Spanish' });
+        setTranslatedPrediction(result.translatedText);
+    } catch (error) {
+        console.error("Translation failed", error);
+        setTranslatedPrediction("La traducción no pudo ser completada.");
+    } finally {
+        setIsTranslating(false);
     }
   };
 
@@ -258,11 +277,28 @@ export default function DashboardPage() {
             </div>
           ) : (
             predictionResult && (
-               <div className="my-4">
-                  <p className="text-lg text-muted-foreground">Ingreso Estimado:</p>
-                  <p className="text-4xl font-bold text-primary">{formatCurrencyCOP(predictionResult.estimatedIncome)}</p>
-                  <p className="text-sm text-foreground mt-4 font-semibold">Análisis de la IA:</p>
-                  <p className="text-sm text-muted-foreground">{predictionResult.analysis}</p>
+               <div className="my-4 space-y-4">
+                  <div>
+                    <p className="text-lg text-muted-foreground">Ingreso Estimado:</p>
+                    <p className="text-4xl font-bold text-primary">{formatCurrencyCOP(predictionResult.estimatedIncome)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-foreground font-semibold">Análisis de la IA:</p>
+                    <p className="text-sm text-muted-foreground italic p-3 bg-muted/50 rounded-md">
+                        {translatedPrediction ? `(Traducido) ${translatedPrediction}` : predictionResult.analysis}
+                    </p>
+                  </div>
+                   {!translatedPrediction && (
+                    <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleTranslatePrediction} 
+                        disabled={isTranslating}
+                    >
+                        <Languages className="mr-2 h-4 w-4" />
+                        {isTranslating ? 'Traduciendo...' : 'Traducir a Español'}
+                    </Button>
+                    )}
                 </div>
             )
           )}

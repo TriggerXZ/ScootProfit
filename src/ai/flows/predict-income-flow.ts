@@ -23,8 +23,8 @@ export type PredictMonthlyIncomeInput = z.infer<typeof PredictMonthlyIncomeInput
 
 // Output schema for the income prediction flow.
 const PredictMonthlyIncomeOutputSchema = z.object({
-  estimatedIncome: z.number().describe('El ingreso estimado para el próximo período de 28 días, en pesos colombianos.'),
-  analysis: z.string().describe('Un breve análisis de la predicción, mencionando tendencias, estacionalidad o nivel de confianza.'),
+  estimatedIncome: z.number().describe('The estimated income for the next 28-day period, in Colombian Pesos.'),
+  analysis: z.string().describe('A brief analysis of the prediction, mentioning trends, seasonality, or confidence level.'),
 });
 export type PredictMonthlyIncomeOutput = z.infer<typeof PredictMonthlyIncomeOutputSchema>;
 
@@ -40,18 +40,18 @@ const incomePredictionPrompt = ai.definePrompt({
   input: { schema: PredictMonthlyIncomeInputSchema },
   output: { schema: PredictMonthlyIncomeOutputSchema },
   prompt: `
-    Eres un analista financiero para un negocio de alquiler de scooters en Colombia.
-    Tu tarea es predecir el ingreso total para el próximo período de 28 días basado en los datos históricos proporcionados.
+    You are a financial analyst for a scooter rental business in Colombia.
+    Your task is to predict the total income for the next 28-day period based on the provided historical data.
 
-    Analiza los datos de ingresos pasados en busca de tendencias, crecimiento y posible estacionalidad.
-    La moneda es el peso colombiano (COP).
+    Analyze the past income data for trends, growth, and potential seasonality.
+    The currency is Colombian Pesos (COP).
 
-    Datos Históricos:
+    Historical Data:
     {{{pastIncome}}}
 
-    Basado en tu análisis, proporciona una estimación de ingresos realista para el próximo período de 28 días.
-    Además, proporciona un breve análisis de una o dos frases explicando tu razonamiento. Por ejemplo, menciona si ves una tendencia de crecimiento o si tu predicción es conservadora debido a fluctuaciones.
-    Presenta el ingreso estimado como un solo número sin símbolos de moneda ni formato.
+    Based on your analysis, provide a realistic income estimate for the next 28-day period.
+    Also, provide a brief one or two-sentence analysis explaining your reasoning. For example, mention if you see a growth trend or if your prediction is conservative due to fluctuations.
+    Present the estimated income as a single number without currency symbols or formatting. Respond in English.
   `,
 });
 
