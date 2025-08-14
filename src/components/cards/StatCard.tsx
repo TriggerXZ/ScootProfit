@@ -15,7 +15,9 @@ interface StatCardProps {
 }
 
 export function StatCard({ title, value, description, icon: Icon, className, valueClassName, percentageChange }: StatCardProps) {
-  const isPositive = percentageChange !== null && percentageChange >= 0;
+  const showPercentage = typeof percentageChange === 'number';
+  const isPositive = showPercentage && percentageChange >= 0;
+  
   return (
     <Card className={cn("shadow-lg hover:shadow-xl transition-shadow duration-300", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -25,7 +27,7 @@ export function StatCard({ title, value, description, icon: Icon, className, val
       <CardContent>
         <div className="flex items-baseline gap-2">
           <div className={cn("text-3xl font-bold font-headline text-foreground", valueClassName)}>{value}</div>
-          {percentageChange !== null && (
+          {showPercentage && (
             <div className={cn(
               "flex items-center text-sm font-semibold",
               isPositive ? "text-green-500" : "text-red-500"
@@ -36,7 +38,7 @@ export function StatCard({ title, value, description, icon: Icon, className, val
           )}
         </div>
         <p className="text-xs text-muted-foreground pt-1">{description}</p>
-        {percentageChange !== null && <p className="text-xs text-muted-foreground">vs. período anterior</p>}
+        {showPercentage && <p className="text-xs text-muted-foreground">vs. período anterior</p>}
       </CardContent>
     </Card>
   );
