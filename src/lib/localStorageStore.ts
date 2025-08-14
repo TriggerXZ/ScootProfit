@@ -1,7 +1,7 @@
 
 // This file should only be imported and used in Client Components.
-import type { RevenueEntry } from '@/types';
-import { LOCAL_STORAGE_REVENUE_KEY } from './constants';
+import type { RevenueEntry, Expense } from '@/types';
+import { LOCAL_STORAGE_REVENUE_KEY, LOCAL_STORAGE_EXPENSES_KEY } from './constants';
 
 // --- Revenue Entries ---
 
@@ -37,4 +37,40 @@ export function deleteRevenueEntry(id: string): void {
 
 export function getRevenueEntryById(id: string): RevenueEntry | undefined {
   return getRevenueEntries().find(entry => entry.id === id);
+}
+
+// --- Expense Entries ---
+
+export function getExpenses(): Expense[] {
+  if (typeof window === 'undefined') return [];
+  const storedExpenses = localStorage.getItem(LOCAL_STORAGE_EXPENSES_KEY);
+  return storedExpenses ? JSON.parse(storedExpenses) : [];
+}
+
+export function saveExpenses(expenses: Expense[]): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOCAL_STORAGE_EXPENSES_KEY, JSON.stringify(expenses));
+}
+
+export function addOrUpdateExpense(expense: Expense): void {
+  const expenses = getExpenses();
+  const existingIndex = expenses.findIndex(e => e.id === expense.id);
+  if (existingIndex > -1) {
+    expenses[existingIndex] = expense;
+  } else {
+    expenses.push(expense);
+  }
+  // Sort expenses by date descending
+  expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  saveExpenses(expenses);
+}
+
+export function deleteExpense(id: string): void {
+  let expenses = getExpenses();
+  expenses = expenses.filter(expense => expense.id !== id);
+  saveExpenses(expenses);
+}
+
+export function getExpenseById(id: string): Expense | undefined {
+    return getExpenses().find(expense => expense.id === id);
 }
