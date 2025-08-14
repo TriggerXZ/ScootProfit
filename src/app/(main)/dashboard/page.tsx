@@ -107,7 +107,7 @@ export default function DashboardPage() {
     } catch (error: any) {
       console.error("Prediction failed", error);
       let analysisMessage = "Ocurrió un error al contactar al servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY).";
-      if (error.message && error.message.includes("overloaded")) {
+      if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
         analysisMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
       }
       setPredictionResult({
