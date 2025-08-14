@@ -103,7 +103,7 @@ export default function DashboardPage() {
       if (historicalData.split(',').length < 2) {
          setPredictionResult({
           estimatedIncome: 0,
-          analysis: "Not enough historical data to make a reliable prediction. At least two full 28-day periods are needed."
+          analysis: "No hay suficientes datos históricos para realizar una predicción fiable. Se necesitan al menos dos períodos completos de 28 días."
         });
         return;
       }
@@ -111,9 +111,9 @@ export default function DashboardPage() {
       setPredictionResult(result);
     } catch (error: any) {
       console.error("Prediction failed", error);
-      let analysisMessage = "An error occurred while contacting the AI service. Please ensure your Gemini API key is correctly configured as an environment variable (GEMINI_API_KEY).";
+      let analysisMessage = "Ocurrió un error al contactar con el servicio de IA. Asegúrate de que tu clave de API de Gemini esté configurada correctamente como una variable de entorno (GEMINI_API_KEY).";
       if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
-        analysisMessage = "The AI model is currently overloaded. Please try again in a few minutes.";
+        analysisMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
       }
       setPredictionResult({
         estimatedIncome: 0,
@@ -132,7 +132,7 @@ export default function DashboardPage() {
         setTranslatedPrediction(result.translatedText);
     } catch (error) {
         console.error("Translation failed", error);
-        setTranslatedPrediction("La traducción no pudo ser completada.");
+        setTranslatedPrediction("La traducción falló. Por favor, inténtalo de nuevo.");
     } finally {
         setIsTranslating(false);
     }

@@ -71,9 +71,9 @@ export default function ReportsPage() {
 
       if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
         setAnalysisResult({
-            executiveSummary: "Not enough data for an analysis.",
+            executiveSummary: "No hay suficientes datos para un análisis.",
             positiveObservations: [],
-            areasForImprovement: ["At least one full period of data is needed to perform a meaningful analysis."],
+            areasForImprovement: ["Se necesita al menos un período completo de datos para realizar un análisis significativo."],
             recommendations: []
         });
         return;
@@ -82,13 +82,13 @@ export default function ReportsPage() {
       const result = await analyzePerformance({ groupTotals: groupTotalsString, locationTotals: locationTotalsString });
       setAnalysisResult(result);
     } catch (error: any) {
-        let errorMessage = "An error occurred while contacting the AI service. Please check your Gemini API key configuration or try again later.";
+        let errorMessage = "Ocurrió un error al contactar con el servicio de IA. Revisa la configuración de tu clave de API de Gemini o inténtalo de nuevo más tarde.";
         if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
-            errorMessage = "The AI model is currently overloaded. Please try again in a few minutes.";
+            errorMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
         }
         console.error("Analysis failed", error);
         setAnalysisResult({
-            executiveSummary: "Error performing analysis.",
+            executiveSummary: "Error al realizar el análisis.",
             positiveObservations: [],
             areasForImprovement: [errorMessage],
             recommendations: []
@@ -120,7 +120,7 @@ export default function ReportsPage() {
           });
       } catch (error) {
           console.error("Translation failed", error);
-          setTranslatedAnalysis({ executiveSummary: "La traducción no pudo ser completada." });
+          setTranslatedAnalysis({ executiveSummary: "La traducción no pudo ser completada. Por favor, inténtelo de nuevo." });
       } finally {
           setIsTranslating(false);
       }
@@ -467,5 +467,3 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-    
