@@ -3,8 +3,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, Users, Download } from 'lucide-react';
-import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from '@/components/ui/sidebar';
+import { Home, Edit3, BarChart3, Settings } from 'lucide-react';
+import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -15,15 +15,11 @@ const navItems = [
 
 const reportNavItems = [
   { href: '/reports', label: 'Resumen de Períodos', icon: BarChart3 },
-  { href: '/reports/members', label: 'Rendimiento de Grupos', icon: Users },
-  { href: '/reports/export', label: 'Exportar Datos', icon: Download },
 ];
 
 export function SidebarNav() {
   const pathname = usePathname();
 
-  // Since this component is now client-only, we can safely derive the active state
-  // from the pathname without causing a hydration mismatch.
   const isReportsActive = pathname.startsWith('/reports');
   const accordionValue = isReportsActive ? "item-1" : "";
 
@@ -70,18 +66,18 @@ export function SidebarNav() {
                     </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-0 pl-4 group-data-[collapsible=icon]:hidden">
-                    <SidebarMenuSub>
+                    <ul className="grid gap-y-1">
                         {reportNavItems.map(item => (
-                            <SidebarMenuSubItem key={item.href}>
+                            <li key={item.href}>
                                 <Link href={item.href} passHref legacyBehavior>
-                                    <SidebarMenuSubButton isActive={pathname === item.href}>
+                                    <SidebarMenuButton isActive={pathname === item.href} className="w-full justify-start">
                                         <item.icon className="h-4 w-4 mr-2"/>
                                         <span>{item.label}</span>
-                                    </SidebarMenuSubButton>
+                                    </SidebarMenuButton>
                                 </Link>
-                            </SidebarMenuSubItem>
+                            </li>
                         ))}
-                    </SidebarMenuSub>
+                    </ul>
                 </AccordionContent>
             </AccordionItem>
         </Accordion>
