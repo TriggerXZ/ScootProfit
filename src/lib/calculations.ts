@@ -163,7 +163,7 @@ const calculateAggregatedTotals = (
   let deductionsDetail: DeductionsDetail;
 
   // Calculate total business deductions if they apply to this period
-  if (applyDecuctionsForThisPeriod && numberOfMembers > 0) {
+  if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
     const totalZonaSegura = zonaSeguraDeduction * numberOfMembers;
     const totalArriendo = arriendoDeduction * numberOfMembers;
     const totalAporteCooperativa = cooperativaDeduction * numberOfMembers;
@@ -304,3 +304,5 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .join(',');
 }
 
+
+    
