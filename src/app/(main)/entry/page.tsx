@@ -9,7 +9,12 @@ import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 import { getMonth, getYear, parseISO } from 'date-fns';
+import { exportRevenuesToCSV } from '@/lib/csvExport';
+import { calculateDailyTotal } from '@/lib/calculations';
+import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 
 export default function RevenueEntryPage() {
   const { entries, addEntry, getEntryByDate, deleteEntry, refreshEntries } = useRevenueEntries();
@@ -60,6 +65,21 @@ export default function RevenueEntryPage() {
     return years;
   }, [entries, currentYear]);
 
+  const handleExport = () => {
+    const dataToExport = filteredEntries.map(entry => {
+        const dailyTotal = calculateDailyTotal(entry);
+        return {
+            date: formatDate(entry.date, 'yyyy-MM-dd'),
+            la72: entry.revenues.la72,
+            elCubo: entry.revenues.elCubo,
+            parqueDeLasLuces: entry.revenues.parqueDeLasLuces,
+            la78: entry.revenues.la78,
+            total: dailyTotal.total
+        };
+    });
+    exportRevenuesToCSV(dataToExport);
+  };
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -99,6 +119,10 @@ export default function RevenueEntryPage() {
                    ))}
                 </SelectContent>
               </Select>
+              <Button onClick={handleExport} variant="outline" size="icon" disabled={filteredEntries.length === 0}>
+                <Download className="h-4 w-4" />
+                <span className="sr-only">Exportar a CSV</span>
+              </Button>
             </div>
           </div>
         </CardHeader>

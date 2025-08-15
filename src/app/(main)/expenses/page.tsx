@@ -9,7 +9,12 @@ import type { Expense } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 import { getMonth, getYear, parseISO } from 'date-fns';
+import { exportExpensesToCSV } from '@/lib/csvExport';
+import { EXPENSE_CATEGORIES } from '@/lib/constants';
+import { formatDate } from '@/lib/formatters';
 
 export default function ExpenseEntryPage() {
   const { expenses, addExpense, deleteExpense, refreshExpenses } = useExpenses();
@@ -59,6 +64,17 @@ export default function ExpenseEntryPage() {
     return years;
   }, [expenses, currentYear]);
 
+  const handleExport = () => {
+    const categoryMap = new Map(EXPENSE_CATEGORIES.map(c => [c.id, c.name]));
+    const dataToExport = filteredExpenses.map(expense => ({
+        date: formatDate(expense.date, 'yyyy-MM-dd'),
+        description: expense.description,
+        categoryName: categoryMap.get(expense.categoryId) || 'Desconocida',
+        amount: expense.amount
+    }));
+    exportExpensesToCSV(dataToExport);
+  };
+
 
   return (
     <div className="container mx-auto py-8 space-y-8">
@@ -98,6 +114,10 @@ export default function ExpenseEntryPage() {
                    ))}
                 </SelectContent>
               </Select>
+              <Button onClick={handleExport} variant="outline" size="icon" disabled={filteredExpenses.length === 0}>
+                <Download className="h-4 w-4" />
+                <span className="sr-only">Exportar a CSV</span>
+              </Button>
             </div>
           </div>
         </CardHeader>
