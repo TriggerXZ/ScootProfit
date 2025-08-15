@@ -1,15 +1,26 @@
-
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { SidebarNav } from './SidebarNav';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Sun, Moon, Coins } from 'lucide-react';
 import { useTheme } from 'next-themes';
 
+// Dynamically import SidebarNav only on the client-side to prevent hydration errors.
+const ClientSidebarNav = dynamic(() => import('@/components/SidebarNav').then(mod => mod.SidebarNav), {
+  ssr: false,
+});
+
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { setTheme, resolvedTheme } = useTheme();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // This effect runs only on the client, after the component has mounted.
+    setIsClient(true);
+  }, []);
 
   return (
     <SidebarProvider defaultOpen>
@@ -21,7 +32,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarNav />
+          {isClient ? <ClientSidebarNav /> : null}
         </SidebarContent>
       </Sidebar>
       <SidebarInset>

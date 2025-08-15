@@ -3,11 +3,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, Users, Download, Receipt } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings, Users, Download } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import React, { useState, useEffect } from 'react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
@@ -22,18 +21,11 @@ const reportNavItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const [accordionValue, setAccordionValue] = useState("");
 
-  useEffect(() => {
-    // Set the accordion value on the client side to avoid hydration mismatch
-    const isReportsActive = pathname.startsWith('/reports');
-    if (isReportsActive) {
-      setAccordionValue("item-1");
-    } else {
-      setAccordionValue("");
-    }
-  }, [pathname]);
-
+  // Since this component is now client-only, we can safely derive the active state
+  // from the pathname without causing a hydration mismatch.
+  const isReportsActive = pathname.startsWith('/reports');
+  const accordionValue = isReportsActive ? "item-1" : "";
 
   return (
     <SidebarMenu>
@@ -59,12 +51,12 @@ export function SidebarNav() {
 
       {/* Reports Dropdown */}
       <SidebarMenuItem>
-         <Accordion type="single" collapsible value={accordionValue} onValueChange={setAccordionValue} className="w-full">
+         <Accordion type="single" collapsible defaultValue={accordionValue} className="w-full">
             <AccordionItem value="item-1" className="border-none">
                 <AccordionTrigger 
                     className={cn(
                         "hover:no-underline p-0 flex rounded-md",
-                         pathname.startsWith('/reports')
+                         isReportsActive
                          ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
                          : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
