@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidebarProvider, Sidebar, SidebarHeader, SidebarContent, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,12 @@ const ClientSidebarNav = dynamic(() => import('@/components/SidebarNav').then(mo
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { setTheme, resolvedTheme } = useTheme();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    // This effect runs only on the client, after the component has mounted.
+    setIsClient(true);
+  }, []);
 
   return (
     <SidebarProvider defaultOpen>
@@ -26,7 +32,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <ClientSidebarNav />
+          {isClient ? <ClientSidebarNav /> : null}
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
