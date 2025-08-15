@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, Users, Download } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings, Users, Download, Receipt } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -50,20 +50,21 @@ export function SidebarNav() {
       <SidebarMenuItem>
          <Accordion type="single" collapsible defaultValue={isReportsActive ? "item-1" : ""} className="w-full">
             <AccordionItem value="item-1" className="border-none">
-                <AccordionTrigger className="hover:no-underline p-0">
-                    <SidebarMenuButton
-                        isActive={isReportsActive}
-                        className={cn(
-                            "w-full justify-start",
-                            (isReportsActive)
-                            ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
-                            : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                        )}
-                        tooltip={{content: "Reportes", side: 'right', className: 'bg-popover text-popover-foreground'}}
-                        >
-                        <BarChart3 className="h-5 w-5 mr-3" />
+                <AccordionTrigger 
+                    className={cn(
+                        "hover:no-underline p-0 flex",
+                        (isReportsActive)
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 rounded-md"
+                        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
+                    )}
+                 >
+                    <div 
+                        className="w-full h-8 px-2 flex items-center gap-2"
+                        tooltip-content="Reportes"
+                    >
+                        <BarChart3 className="h-5 w-5" />
                         <span className="group-data-[collapsible=icon]:hidden">Reportes</span>
-                    </SidebarMenuButton>
+                    </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-0 pl-4 group-data-[collapsible=icon]:hidden">
                     <SidebarMenuSub>
@@ -104,3 +105,4 @@ export function SidebarNav() {
     </SidebarMenu>
   );
 }
+
