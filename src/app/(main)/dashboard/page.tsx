@@ -130,9 +130,13 @@ export default function DashboardPage() {
     try {
         const result = await translateText({ text: predictionResult.analysis, targetLanguage: 'Spanish' });
         setTranslatedPrediction(result.translatedText);
-    } catch (error) {
+    } catch (error: any) {
         console.error("Translation failed", error);
-        setTranslatedPrediction("La traducción falló. Por favor, inténtalo de nuevo.");
+        let errorMessage = "La traducción falló. Por favor, inténtalo de nuevo.";
+        if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
+            errorMessage = "El servicio de traducción está sobrecargado. Inténtalo de nuevo en unos momentos.";
+        }
+        setTranslatedPrediction(errorMessage);
     } finally {
         setIsTranslating(false);
     }
