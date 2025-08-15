@@ -11,6 +11,7 @@ export type LocationId = keyof typeof LOCATIONS extends infer T ? T extends stri
 export const LOCATION_IDS = Object.values(LOCATIONS).map(loc => loc.id) as LocationId[];
 
 export const LOCAL_STORAGE_REVENUE_KEY = 'scootProfitEntries';
+export const LOCAL_STORAGE_EXPENSE_KEY = 'scootProfitExpenses';
 export const LOCAL_STORAGE_SETTINGS_KEY = 'scootProfitSettings';
 
 
@@ -54,14 +55,15 @@ export const INITIAL_ROTATION_ASSIGNMENT: readonly GroupId[] = [
   GROUPS.GRUPO_CUBO.id,     // Assigned to la78
 ];
 
-// --- Expense Tracking Constants ---
-export const LOCAL_STORAGE_EXPENSES_KEY = 'scootProfitExpenses';
 
+// --- Expense Constants ---
 export const EXPENSE_CATEGORIES = [
     { id: 'reparacion', name: 'Reparación y Mantenimiento' },
     { id: 'repuestos', name: 'Repuestos' },
     { id: 'combustible', name: 'Combustible' },
+    { id: 'accesorios', name: 'Accesorios (cascos, etc.)' },
+    { id: 'limpieza', name: 'Limpieza' },
     { id: 'administrativo', name: 'Gastos Administrativos' },
     { id: 'marketing', name: 'Marketing y Publicidad' },
     { id: 'otros', name: 'Otros' },
-] as const;
+];
