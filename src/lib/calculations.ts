@@ -13,7 +13,6 @@ import {
 } from './constants';
 import {
   startOfWeek,
-  startOfMonth,
   parseISO,
   format,
   isSameDay,
@@ -21,6 +20,7 @@ import {
   addDays,
   differenceInWeeks,
   add,
+  differenceInDays,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -163,7 +163,7 @@ const calculateAggregatedTotals = (
   let deductionsDetail: DeductionsDetail;
 
   // Calculate total business deductions if they apply to this period
-  if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
+  if (applyDecuctionsForThisPeriod && numberOfMembers > 0) {
     const totalZonaSegura = zonaSeguraDeduction * numberOfMembers;
     const totalArriendo = arriendoDeduction * numberOfMembers;
     const totalAporteCooperativa = cooperativaDeduction * numberOfMembers;
@@ -231,20 +231,24 @@ const getPeriodData = (
 
 /**
  * Aggregates all revenue entries into weekly totals, starting on Tuesdays.
- * Deductions are only applied to the week that contains the first Tuesday of a calendar month.
+ * Deductions are only applied to the fourth week of a 28-day period.
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each week.
  */
 export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+  if (entries.length === 0) return [];
   const getPeriodKey = (date: Date) => format(startOfWeek(date, { locale: es, weekStartsOn: 2 }), 'yyyy-MM-dd');
   const getPeriodLabel = (date: Date) => `Semana del ${format(date, 'PPP', { locale: es })}`;
   
+  const sortedEntries = [...entries].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  const firstEntryDate = parseISO(sortedEntries[0].date);
+  const firstPeriodStartDate = startOfWeek(firstEntryDate, { locale: es, weekStartsOn: 2 });
+  
   const applyDeductionsLogic = (date: Date) => {
-    const firstDayOfTheMonthOfThisWeek = startOfMonth(date);
-    const dayOfWeekOfFirstDay = getDay(firstDayOfTheMonthOfThisWeek);
-    const daysToAddForFirstTuesday = (2 - dayOfWeekOfFirstDay + 7) % 7;
-    const firstTuesdayOfThisMonth = addDays(firstDayOfTheMonthOfThisWeek, daysToAddForFirstTuesday);
-    return isSameDay(date, firstTuesdayOfThisMonth);
+    const diffInDays = differenceInDays(date, firstPeriodStartDate);
+    const weekIndex = Math.floor(diffInDays / 7); // 0-indexed week number
+    // Apply deductions on the 4th week of every 4-week cycle (e.g., weeks 3, 7, 11, etc.)
+    return (weekIndex + 1) % 4 === 0;
   };
   
   return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
@@ -299,3 +303,4 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
+
