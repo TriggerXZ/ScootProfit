@@ -84,34 +84,55 @@ export default function RevenueEntryPage() {
   };
 
   const handleExportPDF = async () => {
-    const elementToPrint = tableContainerRef.current;
+    const elementToPrint = tableContainerRef.current?.querySelector('table');
     if (!elementToPrint) return;
 
     const html2pdf = (await import('html2pdf.js')).default;
     const monthName = new Date(selectedYear, selectedMonth).toLocaleString('es-ES', { month: 'long' });
     const formattedDate = format(new Date(), 'PPP', { locale: es });
+    
+    // Create a clone of the table to manipulate without affecting the UI
+    const clonedTable = elementToPrint.cloneNode(true) as HTMLElement;
+    
+    // Create a container for the PDF content
+    const container = document.createElement('div');
+    container.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'PT Sans, sans-serif';
+    container.style.color = '#333';
 
+    // Create and style the header
     const titleHTML = `
       <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="font-size: 24px; font-family: 'Poppins', sans-serif;">Historial de Ingresos</h1>
-        <p style="font-size: 16px; font-family: 'PT Sans', sans-serif; color: #555;">
+        <h1 style="font-size: 24px; font-family: 'Poppins', sans-serif; color: #1a1a1a; margin-bottom: 4px;">Historial de Ingresos</h1>
+        <p style="font-size: 16px; color: #555; margin: 0;">
           ${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${selectedYear}
         </p>
-        <p style="font-size: 12px; font-family: 'PT Sans', sans-serif; color: #888;">
+        <p style="font-size: 12px; color: #888; margin-top: 8px;">
           Exportado el ${formattedDate}
         </p>
       </div>
     `;
-
-    const container = document.createElement('div');
     container.innerHTML = titleHTML;
-    container.appendChild(elementToPrint.cloneNode(true));
+
+    // Apply styles to the cloned table for better PDF output
+    clonedTable.style.width = '100%';
+    clonedTable.style.borderCollapse = 'collapse';
+    clonedTable.querySelectorAll('th, td').forEach(cell => {
+        (cell as HTMLElement).style.border = '1px solid #ddd';
+        (cell as HTMLElement).style.padding = '8px';
+        (cell as HTMLElement).style.textAlign = 'left';
+    });
+     clonedTable.querySelectorAll('th').forEach(th => {
+        (th as HTMLElement).style.backgroundColor = '#f2f2f2';
+        (th as HTMLElement).style.fontWeight = 'bold';
+    });
+
+    container.appendChild(clonedTable);
     
     const options = {
       margin: 15,
       filename: `ingresos_${monthName}_${selectedYear}.pdf`,
       image: { type: 'png', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, logging: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     };
 
