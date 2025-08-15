@@ -25,7 +25,7 @@ export const DEFAULT_GROUP_GOAL = 30000000; // Default goal of 30 million COP pe
 
 // Default Deductions FIJAS MENSUALES: Contribución POR MIEMBRO a los costos operativos totales del negocio.
 export const DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER = 20000;
-export const DEFAULT_DEDUSCTION_ARRIENDO_PER_MEMBER = 299000;
+export const DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER = 299000;
 export const DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER = 72000;
 
 

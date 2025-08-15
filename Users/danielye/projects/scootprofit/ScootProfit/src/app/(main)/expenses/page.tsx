@@ -73,7 +73,6 @@ export default function ExpenseEntryPage() {
         onSubmitSuccess={handleSubmitSuccess}
         editingExpense={editingExpense}
         onCancelEdit={handleCancelEdit}
-        addExpense={addExpense}
       />
       
       <Separator />
