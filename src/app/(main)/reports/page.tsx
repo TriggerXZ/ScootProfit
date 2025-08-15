@@ -9,7 +9,7 @@ import { LocationPerformanceChart } from '@/components/charts/LocationPerformanc
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages } from 'lucide-react';
+import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
@@ -17,12 +17,15 @@ import { format } from 'date-fns';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
+import Link from 'next/link';
+
 
 type TranslatedAnalysis = {
     executiveSummary?: string;
     positiveObservations?: string[];
     areasForImprovement?: string[];
     recommendations?: string[];
+    groupComparison?: string;
 };
 
 
@@ -74,7 +77,8 @@ export default function ReportsPage() {
             executiveSummary: "No hay suficientes datos para un análisis.",
             positiveObservations: [],
             areasForImprovement: ["Se necesita al menos un período completo de datos para realizar un análisis significativo."],
-            recommendations: []
+            recommendations: [],
+            groupComparison: "No hay datos suficientes para una comparación."
         });
         return;
       }
@@ -91,7 +95,8 @@ export default function ReportsPage() {
             executiveSummary: "Error al realizar el análisis.",
             positiveObservations: [],
             areasForImprovement: [errorMessage],
-            recommendations: []
+            recommendations: [],
+            groupComparison: "El análisis falló."
         });
     } finally {
       setIsAnalysisLoading(false);
@@ -102,25 +107,31 @@ export default function ReportsPage() {
       if (!analysisResult) return;
       setIsTranslating(true);
       
-      const translate = async (text: string) => (await translateText({ text, targetLanguage: 'Spanish' })).translatedText;
+      const translate = async (text: string) => text ? (await translateText({ text, targetLanguage: 'Spanish' })).translatedText : "";
       const translateArray = (arr: string[]) => Promise.all(arr.map(item => translate(item)));
 
       try {
-          const [summary, positives, improvements, recs] = await Promise.all([
+          const [summary, positives, improvements, recs, comparison] = await Promise.all([
               translate(analysisResult.executiveSummary),
               translateArray(analysisResult.positiveObservations),
               translateArray(analysisResult.areasForImprovement),
-              translateArray(analysisResult.recommendations)
+              translateArray(analysisResult.recommendations),
+              translate(analysisResult.groupComparison)
           ]);
           setTranslatedAnalysis({
               executiveSummary: summary,
               positiveObservations: positives,
               areasForImprovement: improvements,
-              recommendations: recs
+              recommendations: recs,
+              groupComparison: comparison
           });
       } catch (error) {
           console.error("Translation failed", error);
-          setTranslatedAnalysis({ executiveSummary: "La traducción no pudo ser completada. Por favor, inténtelo de nuevo." });
+          let errorMessage = "La traducción no pudo ser completada. Por favor, inténtelo de nuevo.";
+          if (error instanceof Error && (error.message.includes("overloaded") || error.message.includes("503"))) {
+            errorMessage = "El servicio de traducción está sobrecargado. Inténtalo de nuevo en unos momentos.";
+          }
+          setTranslatedAnalysis({ executiveSummary: errorMessage });
       } finally {
           setIsTranslating(false);
       }
@@ -438,6 +449,12 @@ export default function ReportsPage() {
                                 ))}
                             </ul>
                         </div>
+                    </div>
+                     <div>
+                        <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2"><Users className="h-5 w-5 text-indigo-500" />Comparativa de Grupos</h3>
+                        <p className="text-muted-foreground bg-indigo-500/10 p-3 rounded-md italic">
+                           {translatedAnalysis?.groupComparison || analysisResult.groupComparison}
+                        </p>
                     </div>
                     
                     <div>

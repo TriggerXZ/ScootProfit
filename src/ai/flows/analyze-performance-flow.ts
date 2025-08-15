@@ -1,11 +1,11 @@
 
 'use server';
 /**
- * @fileOverview An AI flow to analyze historical business performance and provide insights.
+ * @fileOverview Un flujo de IA para analizar el rendimiento histórico del negocio y proporcionar insights.
  *
- * - analyzePerformance: A function that takes aggregated data and returns a qualitative analysis.
- * - AnalyzePerformanceInput: The input schema for the analysis flow.
- * - AnalyzePerformanceOutput: The output schema for the analysis flow.
+ * - analyzePerformance: Una función que toma datos agregados y devuelve un análisis cualitativo.
+ * - AnalyzePerformanceInput: El tipo de entrada para el flujo de análisis.
+ * - AnalyzePerformanceOutput: El tipo de retorno para el flujo de análisis.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,19 +14,20 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const AnalyzePerformanceInputSchema = z.object({
   locationTotals: z.string().describe(
-    'A comma-separated string of total revenue per location. Example: "La 72: $10,000,000, El Cubo: $8,000,000"'
+    'Una cadena separada por comas de los ingresos totales por ubicación. Ejemplo: "La 72: $10,000,000, El Cubo: $8,000,000"'
   ),
   groupTotals: z.string().describe(
-    'A comma-separated string of total revenue per group. Example: "Grupo Cubo: $9,000,000, Grupo Luces: $9,500,000"'
+    'Una cadena separada por comas de los ingresos totales por grupo de rotación. Ejemplo: "Grupo Cubo: $9,000,000, Grupo Luces: $9,500,000"'
   ),
 });
 export type AnalyzePerformanceInput = z.infer<typeof AnalyzePerformanceInputSchema>;
 
 const AnalyzePerformanceOutputSchema = z.object({
-  executiveSummary: z.string().describe('A brief, high-level summary of the overall business performance.'),
-  positiveObservations: z.array(z.string()).describe('A list of key positive points, such as top-performing locations or groups.'),
-  areasForImprovement: z.array(z.string()).describe('A list of areas that need attention, such as underperforming groups or locations.'),
-  recommendations: z.array(z.string()).describe('A list of actionable recommendations to improve performance.'),
+  executiveSummary: z.string().describe('Un resumen breve y de alto nivel sobre el rendimiento general del negocio.'),
+  positiveObservations: z.array(z.string()).describe('Una lista de puntos positivos clave, como las ubicaciones o grupos con mejor rendimiento.'),
+  areasForImprovement: z.array(z.string()).describe('Una lista de áreas que necesitan atención, como los grupos o ubicaciones con menor rendimiento.'),
+  recommendations: z.array(z.string()).describe('Una lista de recomendaciones accionables para mejorar el rendimiento.'),
+  groupComparison: z.string().describe('Un análisis comparativo detallado entre el rendimiento de los diferentes grupos, destacando eficiencias o inconsistencias.')
 });
 export type AnalyzePerformanceOutput = z.infer<typeof AnalyzePerformanceOutputSchema>;
 
@@ -42,21 +43,22 @@ const performanceAnalysisPrompt = ai.definePrompt({
   input: { schema: AnalyzePerformanceInputSchema },
   output: { schema: AnalyzePerformanceOutputSchema },
   prompt: `
-    You are a business analyst for a scooter rental company in Colombia.
-    Your task is to analyze the provided historical performance data and generate a concise report with actionable insights.
-    The currency is Colombian Pesos (COP).
+    Eres un analista de negocios para una empresa de alquiler de scooters en Colombia.
+    Tu tarea es analizar los datos de rendimiento histórico proporcionados y generar un informe conciso con insights accionables.
+    La moneda es el Peso Colombiano (COP). Responde siempre en español.
 
-    Here is the data to analyze:
-    - Total aggregated revenue for each location: {{{locationTotals}}}
-    - Total aggregated revenue for each rotation group: {{{groupTotals}}}
+    Aquí están los datos para analizar:
+    - Ingresos totales agregados por cada ubicación: {{{locationTotals}}}
+    - Ingresos totales agregados por cada grupo de rotación: {{{groupTotals}}}
 
-    Based on this data, provide the following:
-    1.  **Executive Summary:** A one or two-sentence summary of the overall situation.
-    2.  **Positive Observations:** 2-3 bullet points highlighting what is working well. Identify the top-performing location and group.
-    3.  **Areas for Improvement:** 2-3 bullet points identifying the lowest-performing location and group, or any significant disparities.
-    4.  **Recommendations:** 2-3 clear, actionable recommendations. For example, suggest investigating why a certain group is underperforming or focusing marketing efforts on a specific location.
+    Basado en estos datos, proporciona lo siguiente:
+    1.  **Resumen Ejecutivo:** Un resumen de una o dos frases sobre la situación general.
+    2.  **Observaciones Positivas:** 2-3 puntos destacando lo que está funcionando bien. Identifica la ubicación y el grupo de mayor rendimiento.
+    3.  **Áreas de Mejora:** 2-3 puntos identificando la ubicación y el grupo de menor rendimiento, o cualquier disparidad significativa.
+    4.  **Comparativa de Grupos:** Un análisis un poco más profundo comparando la eficiencia entre los grupos. Por ejemplo, si dos grupos tuvieron ingresos similares, ¿fue uno más consistente que el otro? ¿Hay algún patrón notable?
+    5.  **Recomendaciones:** 2-3 recomendaciones claras y accionables. Por ejemplo, sugiere investigar por qué un grupo está rindiendo por debajo del promedio o enfocar esfuerzos de marketing en una ubicación específica.
 
-    Be concise, professional, and focus on providing real business value. Respond in English.
+    Sé conciso, profesional y enfócate en proporcionar valor de negocio real.
   `,
 });
 
@@ -73,7 +75,7 @@ const analyzePerformanceFlow = ai.defineFlow(
 
     // If the model does not return a valid output, throw an error.
     if (!output) {
-      throw new Error("The AI model did not return a valid analysis.");
+      throw new Error("El modelo de IA no devolvió un análisis válido.");
     }
     
     return output;
