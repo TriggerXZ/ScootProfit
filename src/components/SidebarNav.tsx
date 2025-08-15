@@ -22,17 +22,17 @@ const reportNavItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const isReportsActive = pathname.startsWith('/reports');
   const [accordionValue, setAccordionValue] = useState("");
 
   useEffect(() => {
     // Set the accordion value on the client side to avoid hydration mismatch
+    const isReportsActive = pathname.startsWith('/reports');
     if (isReportsActive) {
       setAccordionValue("item-1");
     } else {
       setAccordionValue("");
     }
-  }, [isReportsActive]);
+  }, [pathname]);
 
 
   return (
@@ -63,10 +63,10 @@ export function SidebarNav() {
             <AccordionItem value="item-1" className="border-none">
                 <AccordionTrigger 
                     className={cn(
-                        "hover:no-underline p-0 flex",
-                        (isReportsActive)
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90 rounded-md"
-                        : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-md"
+                        "hover:no-underline p-0 flex rounded-md",
+                         pathname.startsWith('/reports')
+                         ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+                         : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                     )}
                  >
                     <div 
