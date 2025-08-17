@@ -1,65 +1,69 @@
-{
-  "name": "nextn",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev --turbopack -p 9002",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@genkit-ai/flow": "^0.5.17",
-    "@genkit-ai/googleai": "^1.16.1",
-    "@hookform/resolvers": "^4.1.3",
-    "@radix-ui/react-accordion": "^1.2.3",
-    "@radix-ui/react-alert-dialog": "^1.1.6",
-    "@radix-ui/react-avatar": "^1.1.3",
-    "@radix-ui/react-checkbox": "^1.1.4",
-    "@radix-ui/react-dialog": "^1.1.6",
-    "@radix-ui/react-dropdown-menu": "^2.1.6",
-    "@radix-ui/react-label": "^2.1.2",
-    "@radix-ui/react-menubar": "^1.1.6",
-    "@radix-ui/react-popover": "^1.1.6",
-    "@radix-ui/react-progress": "^1.1.2",
-    "@radix-ui/react-radio-group": "^1.2.3",
-    "@radix-ui/react-scroll-area": "^1.2.3",
-    "@radix-ui/react-select": "^2.1.6",
-    "@radix-ui/react-separator": "^1.1.2",
-    "@radix-ui/react-slider": "^1.2.3",
-    "@radix-ui/react-slot": "^1.1.2",
-    "@radix-ui/react-switch": "^1.1.3",
-    "@radix-ui/react-tabs": "^1.1.3",
-    "@radix-ui/react-toast": "^1.2.6",
-    "@radix-ui/react-tooltip": "^1.1.8",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
-    "firebase": "^11.8.1",
-    "genkit": "^1.1.1",
-    "html2pdf.js": "^0.10.1",
-    "lucide-react": "^0.475.0",
-    "next": "15.2.3",
-    "next-themes": "^0.3.0",
-    "patch-package": "^8.0.0",
-    "react": "^18.3.1",
-    "react-day-picker": "^8.10.1",
-    "react-dom": "^18.3.1",
-    "react-hook-form": "^7.54.2",
-    "recharts": "^2.15.1",
-    "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7",
-    "uuid": "^10.0.0",
-    "zod": "^3.25.76"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "@types/uuid": "^10.0.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
-  }
+'use server';
+/**
+ * @fileOverview Un flujo de IA que actúa como un asistente de negocios para analizar datos financieros.
+ *
+ * - askBusinessAssistant: Una función que toma una pregunta y datos financieros y devuelve una respuesta analítica.
+ * - AskBusinessAssistantInput: El tipo de entrada para el flujo del asistente.
+ * - AskBusinessAssistantOutput: El tipo de retorno para el flujo del asistente.
+ */
+
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
+import { googleAI } from '@genkit-ai/googleai';
+
+const AskBusinessAssistantInputSchema = z.object({
+  question: z.string().describe('La pregunta específica del usuario sobre el negocio.'),
+  revenueData: z.string().describe('Una cadena que resume los datos históricos de ingresos mensuales (28 días). Ejemplo: "Periodo X: $120M, Periodo Y: $130M"'),
+  expenseData: z.string().describe('Una cadena que resume los gastos totales de los últimos meses. Ejemplo: "Enero: $5M, Febrero: $6M"'),
+});
+export type AskBusinessAssistantInput = z.infer<typeof AskBusinessAssistantInputSchema>;
+
+const AskBusinessAssistantOutputSchema = z.object({
+  answer: z.string().describe('La respuesta del asistente a la pregunta del usuario, basada en los datos proporcionados.'),
+});
+export type AskBusinessAssistantOutput = z.infer<typeof AskBusinessAssistantOutputSchema>;
+
+// La función principal exportada que los clientes llamarán.
+export async function askBusinessAssistant(input: AskBusinessAssistantInput): Promise<AskBusinessAssistantOutput> {
+  return assistantFlow(input);
 }
+
+// Define el prompt de Genkit para el modelo de IA.
+const assistantPrompt = ai.definePrompt({
+  name: 'assistantPrompt',
+  model: googleAI.model('gemini-1.5-flash-latest'),
+  input: { schema: AskBusinessAssistantInputSchema },
+  output: { schema: AskBusinessAssistantOutputSchema },
+  prompt: `
+    Eres un asistente de negocios experto para una empresa de alquiler de scooters en Colombia.
+    Tu tarea es responder preguntas de los usuarios sobre el rendimiento del negocio, basándote en los datos financieros proporcionados.
+    La moneda es el Peso Colombiano (COP). Responde siempre en español de forma concisa y amigable.
+
+    Aquí están los datos para tu análisis:
+    - Datos de Ingresos (últimos períodos de 28 días): {{{revenueData}}}
+    - Datos de Gastos (últimos meses): {{{expenseData}}}
+
+    Pregunta del usuario:
+    "{{{question}}}"
+
+    Basado en los datos y la pregunta, proporciona una respuesta clara y útil. Si los datos no son suficientes para responder, indícalo amablemente.
+  `,
+});
+
+// Define el flujo de Genkit que orquesta la lógica del asistente.
+const assistantFlow = ai.defineFlow(
+  {
+    name: 'assistantFlow',
+    inputSchema: AskBusinessAssistantInputSchema,
+    outputSchema: AskBusinessAssistantOutputSchema,
+  },
+  async (input) => {
+    const { output } = await assistantPrompt(input);
+
+    if (!output) {
+      throw new Error("El modelo de IA no devolvió una respuesta válida.");
+    }
+    
+    return output;
+  }
+);
