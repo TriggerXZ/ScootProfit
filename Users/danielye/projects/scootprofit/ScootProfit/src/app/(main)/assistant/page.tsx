@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { Bot, Send, User, AlertTriangle } from 'lucide-react';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
