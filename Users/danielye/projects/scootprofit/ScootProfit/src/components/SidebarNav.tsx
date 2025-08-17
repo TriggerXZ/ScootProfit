@@ -18,16 +18,10 @@ const navItems = [
 export function SidebarNav() {
   const pathname = usePathname();
 
-  // A simple way to handle active state for /reports and its sub-pages
-  const isReportsActive = pathname === '/reports' || pathname.startsWith('/reports/');
-
   return (
     <SidebarMenu>
       {navItems.map((item) => {
-        // Special check for reports to handle nested routes if any in the future
-        const isActive = item.href === '/reports' 
-          ? isReportsActive 
-          : pathname.startsWith(item.href);
+        const isActive = pathname.startsWith(item.href);
 
         return (
           <SidebarMenuItem key={item.href}>
