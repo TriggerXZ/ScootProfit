@@ -18,27 +18,37 @@ const navItems = [
 export function SidebarNav() {
   const pathname = usePathname();
 
+  // A simple way to handle active state for /reports and its sub-pages
+  const isReportsActive = pathname === '/reports' || pathname.startsWith('/reports/');
+
   return (
     <SidebarMenu>
-      {navItems.map((item) => (
-        <SidebarMenuItem key={item.href}>
-          <Link href={item.href} passHref legacyBehavior>
-            <SidebarMenuButton
-              isActive={pathname.startsWith(item.href)}
-              className={cn(
-                "w-full justify-start",
-                (pathname.startsWith(item.href))
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
-                  : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-              tooltip={{content: item.label, side: 'right', className: 'bg-popover text-popover-foreground'}}
-            >
-              <item.icon className="h-5 w-5 mr-3" />
-              <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-            </SidebarMenuButton>
-          </Link>
-        </SidebarMenuItem>
-      ))}
+      {navItems.map((item) => {
+        // Special check for reports to handle nested routes if any in the future
+        const isActive = item.href === '/reports' 
+          ? isReportsActive 
+          : pathname.startsWith(item.href);
+
+        return (
+          <SidebarMenuItem key={item.href}>
+            <Link href={item.href} passHref legacyBehavior>
+              <SidebarMenuButton
+                isActive={isActive}
+                className={cn(
+                  "w-full justify-start",
+                  isActive
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
+                    : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+                tooltip={{content: item.label, side: 'right', className: 'bg-popover text-popover-foreground'}}
+              >
+                <item.icon className="h-5 w-5 mr-3" />
+                <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        );
+      })}
 
        <SidebarMenuItem>
           <Link href="/settings" passHref legacyBehavior>
