@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, ReceiptText, MessageCircle } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings, ReceiptText } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -12,7 +12,6 @@ const navItems = [
   { href: '/entry', label: 'Registrar Ingresos', icon: Edit3 },
   { href: '/expenses', label: 'Registrar Gastos', icon: ReceiptText },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
-  { href: '/assistant', label: 'Asistente IA', icon: MessageCircle },
 ];
 
 export function SidebarNav() {
