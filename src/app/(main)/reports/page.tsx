@@ -18,6 +18,8 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import Link from 'next/link';
+import { DatePickerWithRange } from '@/components/ui/DatePickerWithRange';
+import { DateRange } from 'react-day-picker';
 
 
 type TranslatedAnalysis = {
@@ -30,15 +32,17 @@ type TranslatedAnalysis = {
 
 
 export default function ReportsPage() {
-  const { allWeeklyTotals, allMonthlyTotals, isLoading } = useRevenueEntries();
+  const { allWeeklyTotals, all28DayTotals, allMonthlyTotals, isLoading } = useRevenueEntries();
   const [activeTab, setActiveTab] = useState('weekly');
   const weeklyReportRef = useRef<HTMLDivElement>(null);
   const monthlyReportRef = useRef<HTMLDivElement>(null);
+  const twentyEightDayReportRef = useRef<HTMLDivElement>(null);
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
   const [translatedAnalysis, setTranslatedAnalysis] = useState<TranslatedAnalysis | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const { groupTotals, locationTotals } = useMemo(() => {
     const allTotals = allMonthlyTotals();
@@ -141,9 +145,9 @@ export default function ReportsPage() {
   const handleDownloadReportPDF = async () => {
     const html2pdf = (await import('html2pdf.js')).default; 
 
-    const elementToPrint = activeTab === 'weekly' ? weeklyReportRef.current : monthlyReportRef.current;
-    const reportTitle = activeTab === 'weekly' ? 'Reporte Semanal de Ingresos' : 'Reporte Mensual de Ingresos';
-    const filename = activeTab === 'weekly' ? 'reporte_semanal_scootprofit.pdf' : 'reporte_mensual_scootprofit.pdf';
+    const elementToPrint = activeTab === 'weekly' ? weeklyReportRef.current : activeTab === '28-days' ? twentyEightDayReportRef.current : monthlyReportRef.current;
+    const reportTitle = activeTab === 'weekly' ? 'Reporte Semanal de Ingresos' : activeTab === '28-days' ? 'Reporte de 28 Días de Ingresos' : 'Reporte Mensual de Ingresos';
+    const filename = activeTab === 'weekly' ? 'reporte_semanal_scootprofit.pdf' : activeTab === '28-days' ? 'reporte_28_dias_scootprofit.pdf' : 'reporte_mensual_scootprofit.pdf';
 
     if (elementToPrint) {
       const options = {
@@ -345,21 +349,35 @@ export default function ReportsPage() {
       <div>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
           <h2 className="text-2xl font-headline font-bold text-foreground">Desglose de Períodos</h2>
-          <Button onClick={handleDownloadReportPDF} variant="outline">
-            <FileDown className="mr-2 h-4 w-4" />
-            Descargar Resumen PDF
-          </Button>
+           <div className="flex items-center gap-4">
+            <DatePickerWithRange date={dateRange} onDateChange={setDateRange} />
+            <Button onClick={handleDownloadReportPDF} variant="outline">
+              <FileDown className="mr-2 h-4 w-4" />
+              Descargar Resumen PDF
+            </Button>
+          </div>
         </div>
         <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 md:w-1/2 lg:w-1/3 mb-6">
+          <TabsList className="grid w-full grid-cols-3 md:w-1/2 lg:w-1/3 mb-6">
             <TabsTrigger value="weekly" className="text-base py-2.5">Semanal</TabsTrigger>
-            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual (28 Días)</TabsTrigger>
+            <TabsTrigger value="28-days" className="text-base py-2.5">28 Días</TabsTrigger>
+            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual</TabsTrigger>
           </TabsList>
           <TabsContent value="weekly">
             <div ref={weeklyReportRef}>
               <AggregatedSummarySection 
                 title="Ingresos Semanales" 
-                totals={allWeeklyTotals()} 
+                totals={allWeeklyTotals(dateRange)} 
+                isLoading={isLoading}
+                onDownloadInvoice={handleDownloadInvoicePDF}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="28-days">
+            <div ref={twentyEightDayReportRef}>
+              <AggregatedSummarySection 
+                title="Ingresos por Períodos de 28 días" 
+                totals={all28DayTotals(dateRange)} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
@@ -368,8 +386,8 @@ export default function ReportsPage() {
           <TabsContent value="monthly">
             <div ref={monthlyReportRef}>
               <AggregatedSummarySection 
-                title="Ingresos Mensuales (Períodos de 28 días)" 
-                totals={allMonthlyTotals()} 
+                title="Ingresos Mensuales" 
+                totals={allMonthlyTotals(dateRange)} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />

@@ -13,6 +13,7 @@ import {
 } from './constants';
 import {
   startOfWeek,
+  startOfMonth,
   parseISO,
   format,
   isSameDay,
@@ -260,7 +261,7 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each 28-day period.
  */
-export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+export function get28DayTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   if (entries.length === 0) return [];
   
   const sortedDates = entries.map(e => parseISO(e.date)).sort((a, b) => a.getTime() - b.getTime());
@@ -286,12 +287,29 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
 }
 
 /**
+ * Aggregates all revenue entries into calendar monthly totals.
+ * Deductions are always applied.
+ * @param entries All revenue entries.
+ * @returns An array of AggregatedTotal objects, one for each calendar month.
+ */
+export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+  if (entries.length === 0) return [];
+  
+  const getPeriodKey = (date: Date) => format(startOfMonth(date), 'yyyy-MM-dd');
+  const getPeriodLabel = (date: Date) => `Mes de ${format(date, 'MMMM yyyy', { locale: es })}`;
+  
+  const applyDeductionsLogic = () => true;
+
+  return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
+}
+
+/**
  * Generates a string of historical monthly (28-day period) data for the AI prediction model.
  * @param entries All revenue entries.
  * @returns A comma-separated string of period and total revenue pairs.
  */
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = getMonthlyTotals(entries); 
+  const monthlyTotals = get28DayTotals(entries); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries.reduce((min, p) => (p.date < min ? p.date : min), a.entries[0].date)) : new Date(0);

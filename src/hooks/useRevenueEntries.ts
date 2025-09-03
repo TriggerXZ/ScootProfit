@@ -12,6 +12,7 @@ import {
 import { 
   calculateDailyTotal, 
   getWeeklyTotals, 
+  get28DayTotals,
   getMonthlyTotals,
 } from '@/lib/calculations';
 import { LOCATION_IDS, LocationId } from '@/lib/constants';
@@ -68,6 +69,10 @@ export function useRevenueEntries() {
     return getWeeklyTotals(entries);
   }, [entries]);
 
+  const all28DayTotals = useCallback((): AggregatedTotal[] => {
+    return get28DayTotals(entries);
+  }, [entries]);
+
   const allMonthlyTotals = useCallback((): AggregatedTotal[] => {
     return getMonthlyTotals(entries);
   }, [entries]);
@@ -80,6 +85,7 @@ export function useRevenueEntries() {
     getEntryByDate,
     getDailySummary,
     allWeeklyTotals,
+    all28DayTotals,
     allMonthlyTotals,
     refreshEntries,
   };
