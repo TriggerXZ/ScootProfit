@@ -21,6 +21,7 @@ import {
   differenceInWeeks,
   add,
   differenceInDays,
+  startOfMonth,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -161,32 +162,33 @@ const calculateAggregatedTotals = (
     : 0;
 
   let deductionsDetail: DeductionsDetail;
-  let netMemberShare: number;
 
-  if (applyDeductionsForThisPeriod) {
-    // Deductions are the individual costs per member from settings
-    const totalDeductionsPerMember = zonaSeguraDeduction + arriendoDeduction + cooperativaDeduction;
+  // Calculate total business deductions if they apply to this period
+  if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
+    const totalZonaSegura = zonaSeguraDeduction * numberOfMembers;
+    const totalArriendo = arriendoDeduction * numberOfMembers;
+    const totalAporteCooperativa = cooperativaDeduction * numberOfMembers;
     deductionsDetail = {
-      zonaSegura: zonaSeguraDeduction,
-      arriendo: arriendoDeduction,
-      aporteCooperativa: cooperativaDeduction,
-      totalDeductions: totalDeductionsPerMember,
+      zonaSegura: totalZonaSegura,
+      arriendo: totalArriendo,
+      aporteCooperativa: totalAporteCooperativa,
+      totalDeductions: totalZonaSegura + totalArriendo + totalAporteCooperativa,
     };
-    netMemberShare = grossMemberShare - totalDeductionsPerMember;
   } else {
-    // If deductions don't apply, net share is the same as gross share
     deductionsDetail = {
       zonaSegura: 0,
       arriendo: 0,
       aporteCooperativa: 0,
       totalDeductions: 0,
     };
-    netMemberShare = grossMemberShare;
   }
 
-  // For overall business reporting, calculate total deductions and net revenue
-  const totalBusinessDeductions = deductionsDetail.totalDeductions * (numberOfMembers > 0 ? numberOfMembers : 1);
-  const netRevenueToDistribute = totalRevenueInPeriod - totalBusinessDeductions;
+  const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
+
+  const netMemberShare = numberOfMembers > 0 
+    ? netRevenueToDistribute / numberOfMembers 
+    : 0;
+
 
   return {
     period: periodLabel,
@@ -236,20 +238,18 @@ const getPeriodData = (
  */
 export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   if (entries.length === 0) return [];
-  
   const getPeriodKey = (date: Date) => format(startOfWeek(date, { locale: es, weekStartsOn: 2 }), 'yyyy-MM-dd');
   const getPeriodLabel = (date: Date) => `Semana del ${format(date, 'PPP', { locale: es })}`;
   
   const cycleStartDate = parseISO(ROTATION_START_DATE);
   
-  const applyDeductionsLogic = (weekStartDate: Date) => {
-    // Calculate the number of full weeks since the absolute start date.
-    const weeksSinceCycleStart = differenceInWeeks(weekStartDate, cycleStartDate, { weekStartsOn: 2 });
-    
-    // The cycle repeats every 4 weeks. We apply deductions on the 4th week of the cycle.
-    // The weeks are 0-indexed, so the 4th week is index 3.
-    // (weeksSinceCycleStart % 4) will be 3 for the 4th, 8th, 12th week, etc.
-    return weeksSinceCycleStart >= 0 && (weeksSinceCycleStart % 4 === 3);
+  const applyDeductionsLogic = (date: Date) => {
+    // We use differenceInWeeks to ensure we are comparing full weeks since the cycle start.
+    const weeksSinceCycleStart = differenceInWeeks(date, cycleStartDate, { weekStartsOn: 2 });
+    // The cycle repeats every 4 weeks. Week indices are 0, 1, 2, 3.
+    // We apply deductions on the last week of the cycle (index 3).
+    // (weeksSinceCycleStart % 4) will give a value from 0 to 3. It will be 3 for the 4th, 8th, 12th week, etc.
+    return weeksSinceCycleStart % 4 === 3;
   };
   
   return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
@@ -261,16 +261,15 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each 28-day period.
  */
-export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+export function get28DayTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   if (entries.length === 0) return [];
   
-  const cycleStartDate = parseISO(ROTATION_START_DATE);
+  const firstPeriodStartDate = parseISO(ROTATION_START_DATE);
 
   const getPeriodKey = (date: Date) => {
-    const diffInDays = differenceInDays(date, cycleStartDate);
-    // Ensure we handle dates before the start date gracefully by flooring to a negative index if necessary
+    const diffInDays = differenceInDays(date, firstPeriodStartDate);
     const periodIndex = Math.floor(diffInDays / 28);
-    const periodStartDate = add(cycleStartDate, { days: periodIndex * 28 });
+    const periodStartDate = add(firstPeriodStartDate, { days: periodIndex * 28 });
     return format(periodStartDate, 'yyyy-MM-dd');
   };
 
@@ -285,12 +284,34 @@ export function getMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
 }
 
 /**
+ * Aggregates all revenue entries into calendar monthly totals.
+ * Deductions are always applied for calendar months.
+ * @param entries All revenue entries.
+ * @returns An array of AggregatedTotal objects, one for each calendar month.
+ */
+export function getCalendarMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+  if (entries.length === 0) return [];
+  
+  const getPeriodKey = (date: Date) => format(startOfMonth(date), 'yyyy-MM-dd');
+  
+  const getPeriodLabel = (date: Date) => {
+    const monthName = format(date, 'MMMM yyyy', { locale: es });
+    return `Mes de ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
+  };
+  
+  const applyDeductionsLogic = () => true;
+
+  return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
+}
+
+
+/**
  * Generates a string of historical monthly (28-day period) data for the AI prediction model.
  * @param entries All revenue entries.
  * @returns A comma-separated string of period and total revenue pairs.
  */
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = getMonthlyTotals(entries); 
+  const monthlyTotals = get28DayTotals(entries); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries.reduce((min, p) => (p.date < min ? p.date : min), a.entries[0].date)) : new Date(0);
@@ -302,3 +323,5 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
+
+    

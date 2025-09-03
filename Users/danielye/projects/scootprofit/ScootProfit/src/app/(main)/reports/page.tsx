@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AggregatedSummarySection } from '@/components/sections/AggregatedSummarySection';
 import { GroupPerformanceChart } from '@/components/charts/GroupPerformanceChart';
@@ -13,11 +13,12 @@ import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
-import { format } from 'date-fns';
+import { format, getMonth, getYear, parseISO, startOfMonth } from 'date-fns';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import Link from 'next/link';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 type TranslatedAnalysis = {
@@ -30,34 +31,71 @@ type TranslatedAnalysis = {
 
 
 export default function ReportsPage() {
-  const { allWeeklyTotals, allMonthlyTotals, isLoading } = useRevenueEntries();
+  const { entries, allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, isLoading } = useRevenueEntries();
   const [activeTab, setActiveTab] = useState('weekly');
   const weeklyReportRef = useRef<HTMLDivElement>(null);
-  const monthlyReportRef = useRef<HTMLDivElement>(null);
+  const monthly28DayReportRef = useRef<HTMLDivElement>(null);
+  const monthlyCalendarReportRef = useRef<HTMLDivElement>(null);
+
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
   const [translatedAnalysis, setTranslatedAnalysis] = useState<TranslatedAnalysis | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+  
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => setIsClient(true), []);
+
+  const { yearOptions, monthOptions } = useMemo(() => {
+    if (!isClient || entries.length === 0) return { yearOptions: [new Date().getFullYear()], monthOptions: [] };
+    const years = new Set<number>();
+    const months = new Set<string>();
+    entries.forEach(entry => {
+        const date = parseISO(entry.date);
+        years.add(getYear(date));
+        if (getYear(date) === selectedYear) {
+           months.add(format(date, 'yyyy-MM'));
+        }
+    });
+    const sortedYears = Array.from(years).sort((a,b) => b - a);
+    const sortedMonths = Array.from(months).sort().reverse().map(mStr => {
+        const date = parseISO(`${mStr}-01`);
+        return { value: getMonth(date), label: format(date, 'MMMM', { locale: es }).replace(/^\w/, c => c.toUpperCase()) };
+    });
+
+    return { yearOptions: sortedYears, monthOptions: sortedMonths };
+  }, [entries, selectedYear, isClient]);
 
   const { groupTotals, locationTotals } = useMemo(() => {
-    const allTotals = allMonthlyTotals();
+    const filteredEntries = entries.filter(entry => {
+        const date = parseISO(entry.date);
+        return getMonth(date) === selectedMonth && getYear(date) === selectedYear;
+    });
+
+    const monthlyPeriod = allCalendarMonthlyTotals().find(period => {
+      if (period.entries.length === 0) return false;
+      const periodDate = parseISO(period.entries[0].date);
+      return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
+    });
+    
     const groupMap: { [key: string]: number } = {};
     const locationMap: { [key: string]: number } = {};
 
-    allTotals.forEach(period => {
-      for (const [group, revenue] of Object.entries(period.groupRevenueTotals)) {
-        groupMap[group] = (groupMap[group] || 0) + revenue;
-      }
-      period.entries.forEach(entry => {
-        for (const [location, revenue] of Object.entries(entry.revenues)) {
-          locationMap[location] = (locationMap[location] || 0) + revenue;
+    if(monthlyPeriod) {
+        for (const [group, revenue] of Object.entries(monthlyPeriod.groupRevenueTotals)) {
+          groupMap[group] = (groupMap[group] || 0) + revenue;
         }
-      });
-    });
+        monthlyPeriod.entries.forEach(entry => {
+          for (const [location, revenue] of Object.entries(entry.revenues)) {
+            locationMap[location] = (locationMap[location] || 0) + revenue;
+          }
+        });
+    }
 
     return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [allMonthlyTotals]);
+  }, [entries, selectedMonth, selectedYear, allCalendarMonthlyTotals]);
 
   const handleAnalyzeClick = async () => {
     setIsAnalysisLoading(true);
@@ -140,10 +178,25 @@ export default function ReportsPage() {
 
   const handleDownloadReportPDF = async () => {
     const html2pdf = (await import('html2pdf.js')).default; 
+    
+    let elementToPrint: HTMLDivElement | null = null;
+    let reportTitle = '';
+    let filename = '';
 
-    const elementToPrint = activeTab === 'weekly' ? weeklyReportRef.current : monthlyReportRef.current;
-    const reportTitle = activeTab === 'weekly' ? 'Reporte Semanal de Ingresos' : 'Reporte Mensual de Ingresos';
-    const filename = activeTab === 'weekly' ? 'reporte_semanal_scootprofit.pdf' : 'reporte_mensual_scootprofit.pdf';
+    if (activeTab === 'weekly') {
+        elementToPrint = weeklyReportRef.current;
+        reportTitle = 'Reporte Semanal de Ingresos';
+        filename = 'reporte_semanal_scootprofit.pdf';
+    } else if (activeTab === 'monthly28') {
+        elementToPrint = monthly28DayReportRef.current;
+        reportTitle = 'Reporte Mensual de Ingresos (Periodos de 28 días)';
+        filename = 'reporte_mensual_28dias_scootprofit.pdf';
+    } else if (activeTab === 'monthlyCalendar') {
+        elementToPrint = monthlyCalendarReportRef.current;
+        reportTitle = 'Reporte Mensual de Ingresos (Calendario)';
+        filename = 'reporte_mensual_calendario_scootprofit.pdf';
+    }
+
 
     if (elementToPrint) {
       const options = {
@@ -318,17 +371,41 @@ export default function ReportsPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-           <div className="flex items-center justify-between">
+           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="flex items-center gap-2">
                 <BarChart2 className="h-6 w-6 text-primary" />
-                <CardTitle className="font-headline text-2xl">Análisis de Rendimiento (Histórico)</CardTitle>
+                <CardTitle className="font-headline text-2xl">Análisis de Rendimiento</CardTitle>
             </div>
-             <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading}>
+            <div className="flex items-center gap-2">
+               <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Año" />
+                </SelectTrigger>
+                <SelectContent>
+                   {yearOptions.map(year => (
+                      <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Mes" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(month => (
+                    <SelectItem key={month.value} value={String(month.value)}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+             <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading || Object.keys(groupTotals).length === 0}>
                 <BrainCircuit className="mr-2 h-4 w-4" />
                 Analizar con IA
             </Button>
           </div>
-          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación a lo largo del tiempo.</CardDescription>
+          </div>
+          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación para el período seleccionado.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2 pt-4">
           <div className="h-80">
@@ -351,9 +428,10 @@ export default function ReportsPage() {
           </Button>
         </div>
         <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 md:w-1/2 lg:w-1/3 mb-6">
+          <TabsList className="grid w-full grid-cols-3 md:w-1/2 lg:w-1/2 mb-6">
             <TabsTrigger value="weekly" className="text-base py-2.5">Semanal</TabsTrigger>
-            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual (28 Días)</TabsTrigger>
+            <TabsTrigger value="monthly28" className="text-base py-2.5">28 Días</TabsTrigger>
+            <TabsTrigger value="monthlyCalendar" className="text-base py-2.5">Mensual</TabsTrigger>
           </TabsList>
           <TabsContent value="weekly">
             <div ref={weeklyReportRef}>
@@ -365,11 +443,21 @@ export default function ReportsPage() {
               />
             </div>
           </TabsContent>
-          <TabsContent value="monthly">
-            <div ref={monthlyReportRef}>
+          <TabsContent value="monthly28">
+            <div ref={monthly28DayReportRef}>
               <AggregatedSummarySection 
                 title="Ingresos Mensuales (Períodos de 28 días)" 
-                totals={allMonthlyTotals()} 
+                totals={all28DayTotals()} 
+                isLoading={isLoading}
+                onDownloadInvoice={handleDownloadInvoicePDF}
+              />
+            </div>
+          </TabsContent>
+          <TabsContent value="monthlyCalendar">
+            <div ref={monthlyCalendarReportRef}>
+              <AggregatedSummarySection 
+                title="Ingresos Mensuales (Calendario)" 
+                totals={allCalendarMonthlyTotals()} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
@@ -484,3 +572,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
