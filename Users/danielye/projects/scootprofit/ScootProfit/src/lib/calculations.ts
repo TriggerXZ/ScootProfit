@@ -22,6 +22,7 @@ import {
   add,
   differenceInDays,
   startOfMonth,
+  endOfMonth,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -244,12 +245,8 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
   const cycleStartDate = parseISO(ROTATION_START_DATE);
   
   const applyDeductionsLogic = (date: Date) => {
-    // We use differenceInWeeks to ensure we are comparing full weeks since the cycle start.
     const weeksSinceCycleStart = differenceInWeeks(date, cycleStartDate, { weekStartsOn: 2 });
-    // The cycle repeats every 4 weeks. Week indices are 0, 1, 2, 3.
-    // We apply deductions on the last week of the cycle (index 3).
-    // (weeksSinceCycleStart % 4) will give a value from 0 to 3. It will be 3 for the 4th, 8th, 12th week, etc.
-    return weeksSinceCycleStart % 4 === 3;
+    return (weeksSinceCycleStart + 1) % 4 === 0;
   };
   
   return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
@@ -285,23 +282,23 @@ export function get28DayTotals(entries: RevenueEntry[]): AggregatedTotal[] {
 
 /**
  * Aggregates all revenue entries into calendar monthly totals.
- * Deductions are always applied for calendar months.
+ * Deductions are always applied.
  * @param entries All revenue entries.
  * @returns An array of AggregatedTotal objects, one for each calendar month.
  */
 export function getCalendarMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  if (entries.length === 0) return [];
-  
-  const getPeriodKey = (date: Date) => format(startOfMonth(date), 'yyyy-MM-dd');
-  
-  const getPeriodLabel = (date: Date) => {
-    const monthName = format(date, 'MMMM yyyy', { locale: es });
-    return `Mes de ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
-  };
-  
-  const applyDeductionsLogic = () => true;
+    if (entries.length === 0) return [];
 
-  return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
+    const getPeriodKey = (date: Date) => format(startOfMonth(date), 'yyyy-MM-dd');
+
+    const getPeriodLabel = (date: Date) => {
+        const monthName = format(date, 'MMMM yyyy', { locale: es });
+        return `Mes de ${monthName.charAt(0).toUpperCase() + monthName.slice(1)}`;
+    };
+
+    const applyDeductionsLogic = () => true;
+
+    return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
 }
 
 

@@ -13,11 +13,11 @@ import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
-import { format, getMonth, getYear, parseISO, startOfMonth } from 'date-fns';
+import { format, getMonth, getYear, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
-import Link from 'next/link';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
@@ -69,11 +69,6 @@ export default function ReportsPage() {
   }, [entries, selectedYear, isClient]);
 
   const { groupTotals, locationTotals } = useMemo(() => {
-    const filteredEntries = entries.filter(entry => {
-        const date = parseISO(entry.date);
-        return getMonth(date) === selectedMonth && getYear(date) === selectedYear;
-    });
-
     const monthlyPeriod = allCalendarMonthlyTotals().find(period => {
       if (period.entries.length === 0) return false;
       const periodDate = parseISO(period.entries[0].date);
@@ -95,7 +90,7 @@ export default function ReportsPage() {
     }
 
     return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [entries, selectedMonth, selectedYear, allCalendarMonthlyTotals]);
+  }, [selectedMonth, selectedYear, allCalendarMonthlyTotals]);
 
   const handleAnalyzeClick = async () => {
     setIsAnalysisLoading(true);
