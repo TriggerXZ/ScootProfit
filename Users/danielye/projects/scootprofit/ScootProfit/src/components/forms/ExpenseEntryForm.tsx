@@ -105,6 +105,8 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
     toast({
       title: editingExpense ? "Gasto Actualizado" : "Gasto Guardado",
       description: `El gasto de ${formatCurrencyForInput(data.amount)} ha sido guardado.`,
+      variant: 'default',
+      className: 'bg-green-500 text-white'
     });
     
     onSubmitSuccess();
