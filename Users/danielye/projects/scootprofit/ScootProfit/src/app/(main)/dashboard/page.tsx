@@ -30,7 +30,7 @@ import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/pre
 import { translateText } from '@/ai/flows/translate-text-flow';
 
 export default function DashboardPage() {
-  const { entries, isLoading, getDailySummary, allMonthlyTotals, refreshEntries } = useRevenueEntries();
+  const { entries, isLoading, getDailySummary, all28DayTotals, refreshEntries } = useRevenueEntries();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
@@ -57,11 +57,11 @@ export default function DashboardPage() {
 
   const { currentMonthData, previousMonthData } = useMemo(() => {
     if (isLoading || entries.length === 0) return { currentMonthData: null, previousMonthData: null };
-    const totals = allMonthlyTotals();
+    const totals = all28DayTotals();
     const current = totals.length > 0 ? totals[0] : null;
     const previous = totals.length > 1 ? totals[1] : null;
     return { currentMonthData: current, previousMonthData: previous };
-  }, [allMonthlyTotals, isLoading, entries]);
+  }, [all28DayTotals, isLoading, entries]);
 
 
   const averageDailyRevenue = useMemo(() => {
