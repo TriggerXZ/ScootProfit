@@ -417,10 +417,6 @@ export default function ReportsPage() {
       <div>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
           <h2 className="text-2xl font-headline font-bold text-foreground">Desglose de Períodos</h2>
-          <Button onClick={handleDownloadReportPDF} variant="outline">
-            <FileDown className="mr-2 h-4 w-4" />
-            Descargar Resumen PDF
-          </Button>
         </div>
         <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 md:w-1/2 lg:w-1/2 mb-6">
@@ -567,3 +563,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
