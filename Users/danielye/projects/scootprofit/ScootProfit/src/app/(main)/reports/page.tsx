@@ -9,7 +9,7 @@ import { LocationPerformanceChart } from '@/components/charts/LocationPerformanc
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
+import { FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
 import type { AggregatedTotal } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
@@ -168,100 +168,6 @@ export default function ReportsPage() {
       } finally {
           setIsTranslating(false);
       }
-  };
-
-
-  const handleDownloadReportPDF = async () => {
-    const html2pdf = (await import('html2pdf.js')).default; 
-    
-    let elementToPrint: HTMLDivElement | null = null;
-    let reportTitle = '';
-    let filename = '';
-
-    if (activeTab === 'weekly') {
-        elementToPrint = weeklyReportRef.current;
-        reportTitle = 'Reporte Semanal de Ingresos';
-        filename = 'reporte_semanal_scootprofit.pdf';
-    } else if (activeTab === 'monthly28') {
-        elementToPrint = monthly28DayReportRef.current;
-        reportTitle = 'Reporte Mensual de Ingresos (Periodos de 28 días)';
-        filename = 'reporte_mensual_28dias_scootprofit.pdf';
-    } else if (activeTab === 'monthlyCalendar') {
-        elementToPrint = monthlyCalendarReportRef.current;
-        reportTitle = 'Reporte Mensual de Ingresos (Calendario)';
-        filename = 'reporte_mensual_calendario_scootprofit.pdf';
-    }
-
-
-    if (elementToPrint) {
-      const options = {
-        margin: [15, 10, 15, 10], 
-        filename: filename,
-        image: { type: 'png', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          logging: false, 
-          width: elementToPrint.scrollWidth, 
-          windowWidth: elementToPrint.scrollWidth,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as any[] } 
-      };
-      
-      const clonedElement = elementToPrint.cloneNode(true) as HTMLElement;
-      
-      clonedElement.querySelectorAll('div[data-state="closed"]').forEach(el => {
-        el.setAttribute('data-state', 'open');
-        const content = el.closest('div[data-radix-accordion-item]')?.querySelector('div[data-radix-collapsible-content]');
-        if (content) {
-            (content as HTMLElement).style.height = 'auto';
-            (content as HTMLElement).style.overflow = 'visible';
-            (content as HTMLElement).style.display = 'block'; 
-        }
-      });
-      clonedElement.querySelectorAll('div[data-radix-collapsible-content]').forEach(el => {
-        (el as HTMLElement).style.height = 'auto';
-        (el as HTMLElement).style.overflow = 'visible';
-         (el as HTMLElement).style.display = 'block'; 
-      });
-
-      const titleElement = document.createElement('h1');
-      titleElement.innerText = reportTitle;
-      titleElement.style.fontSize = '18px'; 
-      titleElement.style.fontWeight = 'bold';
-      titleElement.style.textAlign = 'center';
-      titleElement.style.marginBottom = '10px'; 
-      titleElement.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-headline') || 'Poppins, sans-serif'; 
-      const textColor = '#2c3e50';
-      titleElement.style.color = textColor;
-
-      const container = document.createElement('div');
-      container.style.width = '190mm'; 
-      container.style.margin = '0 auto';
-      container.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'PT Sans, sans-serif';
-      container.style.color = textColor;
-      container.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
-      container.style.lineHeight = '1.5';
-      container.style.fontSize = '10pt'; 
-      
-      container.appendChild(titleElement);
-      container.appendChild(clonedElement);
-      
-      document.body.appendChild(container); 
-      
-      try {
-        await html2pdf().from(container).set(options).save();
-      } catch (error) {
-        console.error("Error generating PDF:", error);
-        alert("Hubo un error al generar el PDF. Por favor, inténtalo de nuevo.");
-      } finally {
-        document.body.removeChild(container); 
-      }
-
-    } else {
-      console.error("Element to print not found for tab:", activeTab);
-    }
   };
 
   const handleDownloadInvoicePDF = async (item: AggregatedTotal) => {
