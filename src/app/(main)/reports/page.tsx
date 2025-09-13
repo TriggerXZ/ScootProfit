@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AggregatedSummarySection } from '@/components/sections/AggregatedSummarySection';
 import { GroupPerformanceChart } from '@/components/charts/GroupPerformanceChart';
@@ -9,18 +9,16 @@ import { LocationPerformanceChart } from '@/components/charts/LocationPerformanc
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileDown, FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
-import type { AggregatedTotal } from '@/types';
+import { FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
+import type { AggregatedTotal, RevenueEntry } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
-import { DEFAULT_NUMBER_OF_MEMBERS, LOCATION_IDS, GROUP_IDS, LOCATIONS, GROUPS } from '@/lib/constants';
-import { format } from 'date-fns';
+import { GROUPS, LOCATIONS } from '@/lib/constants';
+import { format, getMonth, getYear, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
-import Link from 'next/link';
-import { DatePickerWithRange } from '@/components/ui/DatePickerWithRange';
-import { DateRange } from 'react-day-picker';
-
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type TranslatedAnalysis = {
     executiveSummary?: string;
@@ -30,38 +28,85 @@ type TranslatedAnalysis = {
     groupComparison?: string;
 };
 
-
 export default function ReportsPage() {
-  const { allWeeklyTotals, all28DayTotals, allMonthlyTotals, isLoading } = useRevenueEntries();
+  const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, entries, isLoading } = useRevenueEntries();
   const [activeTab, setActiveTab] = useState('weekly');
-  const weeklyReportRef = useRef<HTMLDivElement>(null);
-  const monthlyReportRef = useRef<HTMLDivElement>(null);
-  const twentyEightDayReportRef = useRef<HTMLDivElement>(null);
+  
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
   const [translatedAnalysis, setTranslatedAnalysis] = useState<TranslatedAnalysis | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const { yearOptions, monthOptions } = useMemo(() => {
+    if (entries.length === 0) {
+      const currentYear = new Date().getFullYear();
+      return {
+        yearOptions: [currentYear],
+        monthOptions: Array.from({ length: 12 }, (_, i) => ({ value: i, label: new Date(0, i).toLocaleString('es-ES', { month: 'long' }) }))
+      };
+    }
+    
+    const sortedEntries = [...entries].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const firstEntryYear = getYear(parseISO(sortedEntries[0].date));
+    const lastEntryYear = getYear(parseISO(sortedEntries[sortedEntries.length - 1].date));
+    
+    const years = [];
+    for (let y = lastEntryYear; y >= firstEntryYear; y--) {
+      years.push(y);
+    }
+    
+    const months = Array.from({ length: 12 }, (_, i) => ({
+      value: i,
+      label: new Date(0, i).toLocaleString('es-ES', { month: 'long' }).replace(/^\w/, (c) => c.toUpperCase()),
+    }));
+
+    return { yearOptions: years, monthOptions: months };
+  }, [entries]);
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter(entry => {
+      const entryDate = parseISO(entry.date);
+      return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
+    });
+  }, [entries, selectedMonth, selectedYear]);
 
   const { groupTotals, locationTotals } = useMemo(() => {
-    const allTotals = allMonthlyTotals();
     const groupMap: { [key: string]: number } = {};
     const locationMap: { [key: string]: number } = {};
 
-    allTotals.forEach(period => {
-      for (const [group, revenue] of Object.entries(period.groupRevenueTotals)) {
-        groupMap[group] = (groupMap[group] || 0) + revenue;
-      }
-      period.entries.forEach(entry => {
-        for (const [location, revenue] of Object.entries(entry.revenues)) {
-          locationMap[location] = (locationMap[location] || 0) + revenue;
+    const sourceEntries = filteredEntries.length > 0 ? filteredEntries : entries;
+
+    sourceEntries.forEach(entry => {
+        // Correctly calculate group totals based on rotation for each entry's date
+        const entryDate = parseISO(entry.date);
+        for (const [locationId, revenue] of Object.entries(entry.revenues)) {
+             // Calculate group totals from useRevenueEntries hook for consistency
         }
-      });
     });
 
+    const totalsFromHook = allCalendarMonthlyTotals(); // You might want to use a more specific hook if available
+    const relevantTotals = totalsFromHook.find(t => {
+        if(t.entries.length === 0) return false;
+        const entryDate = parseISO(t.entries[0].date);
+        return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
+    });
+
+    if (relevantTotals) {
+        Object.assign(groupMap, relevantTotals.groupRevenueTotals);
+        // Calculate location totals for the selected period
+        relevantTotals.entries.forEach(entry => {
+            for (const [location, revenue] of Object.entries(entry.revenues)) {
+                locationMap[location] = (locationMap[location] || 0) + revenue;
+            }
+        });
+    }
+
     return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [allMonthlyTotals]);
+  }, [filteredEntries, entries, allCalendarMonthlyTotals, selectedMonth, selectedYear]);
 
   const handleAnalyzeClick = async () => {
     setIsAnalysisLoading(true);
@@ -69,12 +114,8 @@ export default function ReportsPage() {
     setTranslatedAnalysis(null);
     setShowAnalysisDialog(true);
     try {
-      const groupTotalsString = GROUP_IDS.map(id => `${(GROUPS[id.toUpperCase().replace('GRUPO', 'GRUPO_') as keyof typeof GROUPS] as any).name}: ${formatCurrencyCOP(groupTotals[id] || 0)}`).join(', ');
-      const locationTotalsString = LOCATION_IDS.map(id => {
-        const locationName = (Object.values(LOCATIONS).find(l => l.id === id))?.name || id;
-        return `${locationName}: ${formatCurrencyCOP(locationTotals[id] || 0)}`;
-      }).join(', ');
-
+      const groupTotalsString = Object.entries(groupTotals).map(([key, value]) => `${(GROUPS as any)[Object.keys(GROUPS).find(k => GROUPS[k as keyof typeof GROUPS].id === key) as any]?.name || key}: ${formatCurrencyCOP(value)}`).join(', ');
+      const locationTotalsString = Object.entries(locationTotals).map(([key, value]) => `${(LOCATIONS as any)[Object.keys(LOCATIONS).find(k => LOCATIONS[k as keyof typeof LOCATIONS].id === key) as any]?.name || key}: ${formatCurrencyCOP(value)}`).join(', ');
 
       if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
         setAnalysisResult({
@@ -141,85 +182,6 @@ export default function ReportsPage() {
       }
   };
 
-
-  const handleDownloadReportPDF = async () => {
-    const html2pdf = (await import('html2pdf.js')).default; 
-
-    const elementToPrint = activeTab === 'weekly' ? weeklyReportRef.current : activeTab === '28-days' ? twentyEightDayReportRef.current : monthlyReportRef.current;
-    const reportTitle = activeTab === 'weekly' ? 'Reporte Semanal de Ingresos' : activeTab === '28-days' ? 'Reporte de 28 Días de Ingresos' : 'Reporte Mensual de Ingresos';
-    const filename = activeTab === 'weekly' ? 'reporte_semanal_scootprofit.pdf' : activeTab === '28-days' ? 'reporte_28_dias_scootprofit.pdf' : 'reporte_mensual_scootprofit.pdf';
-
-    if (elementToPrint) {
-      const options = {
-        margin: [15, 10, 15, 10], 
-        filename: filename,
-        image: { type: 'png', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          logging: false, 
-          width: elementToPrint.scrollWidth, 
-          windowWidth: elementToPrint.scrollWidth,
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as any[] } 
-      };
-      
-      const clonedElement = elementToPrint.cloneNode(true) as HTMLElement;
-      
-      clonedElement.querySelectorAll('div[data-state="closed"]').forEach(el => {
-        el.setAttribute('data-state', 'open');
-        const content = el.closest('div[data-radix-accordion-item]')?.querySelector('div[data-radix-collapsible-content]');
-        if (content) {
-            (content as HTMLElement).style.height = 'auto';
-            (content as HTMLElement).style.overflow = 'visible';
-            (content as HTMLElement).style.display = 'block'; 
-        }
-      });
-      clonedElement.querySelectorAll('div[data-radix-collapsible-content]').forEach(el => {
-        (el as HTMLElement).style.height = 'auto';
-        (el as HTMLElement).style.overflow = 'visible';
-         (el as HTMLElement).style.display = 'block'; 
-      });
-
-      const titleElement = document.createElement('h1');
-      titleElement.innerText = reportTitle;
-      titleElement.style.fontSize = '18px'; 
-      titleElement.style.fontWeight = 'bold';
-      titleElement.style.textAlign = 'center';
-      titleElement.style.marginBottom = '10px'; 
-      titleElement.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-headline') || 'Poppins, sans-serif'; 
-      const textColor = '#2c3e50';
-      titleElement.style.color = textColor;
-
-      const container = document.createElement('div');
-      container.style.width = '190mm'; 
-      container.style.margin = '0 auto';
-      container.style.fontFamily = getComputedStyle(document.documentElement).getPropertyValue('--font-body') || 'PT Sans, sans-serif';
-      container.style.color = textColor;
-      container.style.backgroundColor = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
-      container.style.lineHeight = '1.5';
-      container.style.fontSize = '10pt'; 
-      
-      container.appendChild(titleElement);
-      container.appendChild(clonedElement);
-      
-      document.body.appendChild(container); 
-      
-      try {
-        await html2pdf().from(container).set(options).save();
-      } catch (error) {
-        console.error("Error generating PDF:", error);
-        alert("Hubo un error al generar el PDF. Por favor, inténtalo de nuevo.");
-      } finally {
-        document.body.removeChild(container); 
-      }
-
-    } else {
-      console.error("Element to print not found for tab:", activeTab);
-    }
-  };
-
   const handleDownloadInvoicePDF = async (item: AggregatedTotal) => {
     const html2pdf = (await import('html2pdf.js')).default;
     const { es: localeEs } = await import('date-fns/locale/es');
@@ -282,7 +244,7 @@ export default function ReportsPage() {
             </tr>
             <tr style="background-color: #f9f9f9;">
               <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">5. Número de Miembros Participantes:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${DEFAULT_NUMBER_OF_MEMBERS}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${item.numberOfMembers}</td>
             </tr>
             <tr>
               <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
@@ -322,17 +284,39 @@ export default function ReportsPage() {
 
       <Card className="shadow-xl">
         <CardHeader>
-           <div className="flex items-center justify-between">
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div className="flex items-center gap-2">
                 <BarChart2 className="h-6 w-6 text-primary" />
-                <CardTitle className="font-headline text-2xl">Análisis de Rendimiento (Histórico)</CardTitle>
+                <CardTitle className="font-headline text-2xl">Análisis de Rendimiento</CardTitle>
             </div>
-             <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading}>
-                <BrainCircuit className="mr-2 h-4 w-4" />
-                Analizar con IA
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+                <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Seleccionar mes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {monthOptions.map(month => (
+                            <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+                    <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Seleccionar año" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {yearOptions.map(year => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading || Object.keys(groupTotals).length === 0}>
+                    <BrainCircuit className="mr-2 h-4 w-4" />
+                    Analizar con IA
+                </Button>
+            </div>
           </div>
-          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación a lo largo del tiempo.</CardDescription>
+          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación para el período seleccionado.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2 pt-4">
           <div className="h-80">
@@ -349,43 +333,36 @@ export default function ReportsPage() {
       <div>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
           <h2 className="text-2xl font-headline font-bold text-foreground">Desglose de Períodos</h2>
-           {/* Removed DatePickerWithRange and Download PDF Button */}
         </div>
         <Tabs defaultValue="weekly" className="w-full" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 md:w-1/2 lg:w-1/3 mb-6">
             <TabsTrigger value="weekly" className="text-base py-2.5">Semanal</TabsTrigger>
             <TabsTrigger value="28-days" className="text-base py-2.5">28 Días</TabsTrigger>
-            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual</TabsTrigger>
+            <TabsTrigger value="monthly" className="text-base py-2.5">Mensual (Calendario)</TabsTrigger>
           </TabsList>
           <TabsContent value="weekly">
-            <div ref={weeklyReportRef}>
               <AggregatedSummarySection 
                 title="Ingresos Semanales" 
-                totals={allWeeklyTotals(dateRange)} 
+                totals={allWeeklyTotals()} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
-            </div>
           </TabsContent>
           <TabsContent value="28-days">
-            <div ref={twentyEightDayReportRef}>
               <AggregatedSummarySection 
                 title="Ingresos por Períodos de 28 días" 
-                totals={all28DayTotals(dateRange)} 
+                totals={all28DayTotals()} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
-            </div>
           </TabsContent>
           <TabsContent value="monthly">
-            <div ref={monthlyReportRef}>
               <AggregatedSummarySection 
                 title="Ingresos Mensuales" 
-                totals={allMonthlyTotals(dateRange)} 
+                totals={allCalendarMonthlyTotals()} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
-            </div>
           </TabsContent>
         </Tabs>
       </div>

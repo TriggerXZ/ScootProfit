@@ -8,6 +8,7 @@ import {
   addOrUpdateExpense as saveExpense,
   deleteExpense as removeExpense
 } from '@/lib/localStorageStore';
+import { v4 as uuidv4 } from 'uuid';
 
 export function useExpenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -25,11 +26,14 @@ export function useExpenses() {
 
 
   const addExpense = useCallback((expenseData: Omit<Expense, 'id'>) => {
-    const newExpense: Expense = {
-      id: new Date().toISOString(), // Unique ID
-      ...expenseData,
-    };
-    saveExpense(newExpense);
+    // If editing an existing expense, it should already have an ID.
+    // This function handles both creating new and updating existing.
+    // The form logic will pass the full expense object when editing.
+    const expenseToSave = 'id' in expenseData 
+      ? (expenseData as Expense)
+      : { ...expenseData, id: uuidv4() };
+
+    saveExpense(expenseToSave);
     refreshExpenses();
   }, [refreshExpenses]);
 
