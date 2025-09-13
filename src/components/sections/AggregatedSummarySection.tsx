@@ -14,7 +14,7 @@ import {
   GROUP_IDS,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, AlertCircle, Group, TrendingUp, TrendingDown } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, AlertCircle, Group, TrendingUp, TrendingDown, CheckCircle, XCircle } from 'lucide-react';
 import { useSettings } from '@/hooks/useSettings';
 
 
@@ -70,7 +70,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             const isWeeklyReport = title.toLowerCase().includes('semanal');
             const goal = isWeeklyReport ? settings.weeklyGoal : settings.monthlyGoal;
-            const isGoalMet = item.totalRevenueInPeriod >= goal;
+            const isGoalMet = goal > 0 && item.totalRevenueInPeriod >= goal;
 
             return (
               <AccordionItem value={`item-${index}`} key={item.period}>
@@ -80,12 +80,20 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <CalendarDays className="h-5 w-5 text-primary" />
                       <span className="text-left">{item.period}</span>
                     </span>
-                    <div className="text-right">
-                      <div className={`text-xl font-semibold flex items-center justify-end ${item.finalNetProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                         {item.finalNetProfit >= 0 ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
-                        {formatCurrencyCOP(item.finalNetProfit)}
+                    <div className="text-right flex items-center gap-4">
+                       {goal > 0 && (
+                        <div className={`flex items-center gap-1 text-xs font-semibold ${isGoalMet ? 'text-green-500' : 'text-red-500'}`}>
+                          {isGoalMet ? <CheckCircle className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                          <span>{isGoalMet ? 'Meta Cumplida' : 'Meta No Cumplida'}</span>
+                        </div>
+                      )}
+                      <div>
+                        <div className={`text-xl font-semibold flex items-center justify-end ${item.finalNetProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {item.finalNetProfit >= 0 ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
+                          {formatCurrencyCOP(item.finalNetProfit)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Beneficio Neto del Periodo</div>
                       </div>
-                      <div className="text-xs text-muted-foreground">Beneficio Neto del Periodo</div>
                     </div>
                   </div>
                 </AccordionTrigger>
