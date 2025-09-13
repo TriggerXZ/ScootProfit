@@ -12,7 +12,7 @@ import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, isWithinInterval, parseISO } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 import {
   AlertDialog,
@@ -27,9 +27,11 @@ import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/pre
 import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import { useSettings } from '@/hooks/useSettings';
-import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users } from 'lucide-react';
+import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users, PieChart } from 'lucide-react';
 import { TopPerformerCard } from '@/components/cards/TopPerformerCard';
 import { GROUPS, LOCATIONS } from '@/lib/constants';
+import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
+import type { Expense } from '@/types';
 
 
 export default function DashboardPage() {
@@ -70,6 +72,22 @@ export default function DashboardPage() {
     const previous = totals.length > 1 ? totals[1] : null;
     return { currentMonthData: current, previousMonthData: previous };
   }, [all28DayTotals, isLoading, entries, expenses]);
+  
+  const currentPeriodExpenses: Expense[] = useMemo(() => {
+    if (!currentMonthData || expenses.length === 0) return [];
+    
+    // We need to parse the period string to get start and end dates.
+    // Assuming the period format is "Periodo del D MMM al D MMM YYYY"
+    const periodStartDate = currentMonthData.entries.length > 0 ? parseISO(currentMonthData.entries[currentMonthData.entries.length - 1].date) : new Date();
+    const periodEndDate = currentMonthData.entries.length > 0 ? parseISO(currentMonthData.entries[0].date) : new Date();
+
+    const interval = {
+        start: periodStartDate,
+        end: periodEndDate
+    };
+
+    return expenses.filter(expense => isWithinInterval(parseISO(expense.date), interval));
+  }, [currentMonthData, expenses]);
 
   const topPerformers = useMemo(() => {
     if (!currentMonthData) return { topGroup: null, topLocation: null };
@@ -112,13 +130,6 @@ export default function DashboardPage() {
           .filter(e => e.date === dateString)
           .reduce((sum, e) => sum + e.amount, 0);
   }, [selectedDate, expenses]);
-
-  const percentageChange = useMemo(() => {
-    if (currentMonthData && previousMonthData && typeof previousMonthData.totalRevenueInPeriod === 'number' && previousMonthData.totalRevenueInPeriod > 0) {
-      return ((currentMonthData.totalRevenueInPeriod - previousMonthData.totalRevenueInPeriod) / previousMonthData.totalRevenueInPeriod) * 100;
-    }
-    return undefined;
-  }, [currentMonthData, previousMonthData]);
 
   const handlePredictClick = async () => {
     setIsPredictionLoading(true);
@@ -204,7 +215,6 @@ export default function DashboardPage() {
           value={formatCurrencyCOP(currentMonthData?.totalRevenueInPeriod ?? 0)}
           icon={TrendingUp}
           description={currentMonthData?.period ?? "Últimos 28 días"}
-          percentageChange={percentageChange}
           comparisonValue={previousMonthData?.totalRevenueInPeriod}
         />
         <StatCard 
@@ -245,6 +255,17 @@ export default function DashboardPage() {
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
+           <Card className="shadow-lg">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <PieChart className="h-6 w-6 text-primary" />
+                        <CardTitle className="font-headline text-xl">Gastos por Categoría</CardTitle>
+                    </div>
+                </CardHeader>
+                <CardContent className="h-48">
+                    <ExpenseCategoryChart expenses={currentPeriodExpenses} />
+                </CardContent>
+            </Card>
           <TopPerformerCard
             topGroup={topPerformers.topGroup}
             topLocation={topPerformers.topLocation}
@@ -363,3 +384,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    
