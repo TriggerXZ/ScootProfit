@@ -17,7 +17,7 @@ import type { AggregatedTotal } from '@/types';
 
 
 export default function MembersPage() {
-  const { allCalendarMonthlyTotals, isLoading: isLoadingRevenues, entries } from useRevenueEntries();
+  const { allCalendarMonthlyTotals, isLoading: isLoadingRevenues, entries } = useRevenueEntries();
   const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const { settings, isLoading: isLoadingSettings } = useSettings();
   
