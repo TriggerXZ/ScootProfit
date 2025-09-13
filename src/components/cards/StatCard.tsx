@@ -25,12 +25,21 @@ export function StatCard({ title, value, description, icon: Icon, className, val
   let comparisonChange: number | undefined = percentageChange;
   
   if (typeof comparisonChange === 'undefined' && hasComparison) {
-      const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.-]+/g,"")) : value;
-      if (comparisonValue > 0) {
-        comparisonChange = ((numericValue - comparisonValue) / comparisonValue) * 100;
+      // Remove all non-digit characters to get the pure number for calculation
+      const numericValue = typeof value === 'string' ? parseFloat(value.replace(/[^0-9-]/g, "")) : value;
+      
+      if (comparisonValue !== 0) {
+        comparisonChange = ((numericValue - comparisonValue) / Math.abs(comparisonValue)) * 100;
       } else if (numericValue > 0) {
-        comparisonChange = 100; // From 0 to positive is a 100% increase
+        // If previous was 0 and current is positive, it's a significant increase.
+        // Representing as 100% is a common way to show this.
+        comparisonChange = 100;
+      } else if (numericValue === 0) {
+        // From 0 to 0 is no change.
+        comparisonChange = 0;
       }
+      // If comparisonValue is 0 and numericValue is negative, change is undefined or -100%
+      // Current logic will leave comparisonChange undefined which hides the indicator. This is acceptable.
   }
 
   const isComparisonPositive = typeof comparisonChange === 'number' && comparisonChange >= 0;
@@ -45,7 +54,7 @@ export function StatCard({ title, value, description, icon: Icon, className, val
       <CardContent>
         <div className="flex items-baseline gap-2">
           <div className={cn("text-3xl font-bold font-headline text-foreground", valueClassName)}>{value}</div>
-          {typeof comparisonChange === 'number' && (
+          {typeof comparisonChange === 'number' && !isNaN(comparisonChange) && (
             <div className={cn(
               "flex items-center text-sm font-semibold",
               isComparisonPositive ? "text-green-500" : "text-red-500"
