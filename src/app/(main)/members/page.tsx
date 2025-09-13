@@ -18,7 +18,7 @@ import type { AggregatedTotal } from '@/types';
 
 export default function MembersPage() {
   const { allCalendarMonthlyTotals, isLoading: isLoadingRevenues, entries } from useRevenueEntries();
-  const { expenses, isLoading: isLoadingExpenses } from 'useExpenses';
+  const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const { settings, isLoading: isLoadingSettings } = useSettings();
   
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
