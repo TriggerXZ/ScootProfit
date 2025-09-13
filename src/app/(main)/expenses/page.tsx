@@ -5,6 +5,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { ExpenseEntryForm } from '@/components/forms/ExpenseEntryForm';
 import { RecentExpensesTable } from '@/components/sections/RecentExpensesTable';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useRevenueEntries } from '@/hooks/useRevenueEntries'; // Importar hook de ingresos
 import type { Expense } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -19,6 +20,7 @@ import { formatDate, formatCurrencyCOP } from '@/lib/formatters';
 
 export default function ExpenseEntryPage() {
   const { expenses, addExpense, deleteExpense, refreshExpenses } = useExpenses();
+  const { entries: revenueEntries, getEntryByDate } = useRevenueEntries(); // Obtener datos y función de ingresos
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isClient, setIsClient] = useState(false);
 
@@ -210,6 +212,8 @@ export default function ExpenseEntryPage() {
         editingExpense={editingExpense}
         onCancelEdit={handleCancelEdit}
         addExpense={addExpense}
+        getRevenueEntryByDate={getEntryByDate}
+        allExpenses={expenses}
       />
       
       <Separator />

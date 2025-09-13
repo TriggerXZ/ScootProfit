@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -13,11 +13,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { EXPENSE_CATEGORIES } from '@/lib/constants';
-import type { Expense } from '@/types';
+import type { Expense, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, AlertTriangle } from 'lucide-react';
+import { calculateDailyTotal } from '@/lib/calculations';
+import { useSettings } from '@/hooks/useSettings';
+import { formatCurrencyCOP } from '@/lib/formatters';
 
 const expenseSchema = z.object({
   date: z.date({ required_error: "La fecha es requerida." }),
@@ -33,6 +36,8 @@ interface ExpenseEntryFormProps {
   editingExpense: Expense | null;
   onCancelEdit: () => void;
   addExpense: (expense: Omit<Expense, 'id'>) => void;
+  getRevenueEntryByDate: (date: string) => RevenueEntry | undefined;
+  allExpenses: Expense[];
 }
 
 const formatCurrencyForInput = (value: string | number): string => {
@@ -46,12 +51,20 @@ const parseCurrencyFromInput = (value: string): number => {
 }
 
 
-export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit, addExpense }: ExpenseEntryFormProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+export function ExpenseEntryForm({ 
+    onSubmitSuccess, 
+    editingExpense, 
+    onCancelEdit, 
+    addExpense,
+    getRevenueEntryByDate,
+    allExpenses
+}: ExpenseEntryFormProps) {
   const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
+  const [impactMessage, setImpactMessage] = useState<string | null>(null);
   const { toast } = useToast();
+  const { settings } = useSettings();
 
-  const { control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
+  const { control, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       date: new Date(),
@@ -60,12 +73,14 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
       categoryId: undefined,
     },
   });
+  
+  const watchedDate = watch("date");
+  const watchedAmount = watch("amount");
 
   useEffect(() => {
     const today = new Date();
     setClientToday(today);
     if (!editingExpense) {
-        setSelectedDate(today);
         setValue("date", today);
     }
   }, [editingExpense, setValue]);
@@ -73,14 +88,12 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
   useEffect(() => {
     if (editingExpense) {
       const entryDate = parseISO(editingExpense.date);
-      setSelectedDate(entryDate);
       setValue("date", entryDate);
       setValue("description", editingExpense.description);
       setValue("amount", editingExpense.amount);
       setValue("categoryId", editingExpense.categoryId);
     } else {
         const today = new Date();
-        setSelectedDate(today);
         reset({
             date: today,
             description: "",
@@ -89,6 +102,34 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
         });
     }
   }, [editingExpense, setValue, reset]);
+
+  useEffect(() => {
+    if (!watchedDate || watchedAmount <= 0) {
+      setImpactMessage(null);
+      return;
+    }
+
+    const dateString = format(watchedDate, 'yyyy-MM-dd');
+    const revenueEntry = getRevenueEntryByDate(dateString);
+    const dayRevenue = revenueEntry ? calculateDailyTotal(revenueEntry, settings).total : 0;
+
+    const dayExpenses = allExpenses
+        .filter(e => e.date === dateString && e.id !== editingExpense?.id)
+        .reduce((sum, e) => sum + e.amount, 0);
+
+    const newTotalExpenses = dayExpenses + watchedAmount;
+
+    if (newTotalExpenses > dayRevenue) {
+        if (dayRevenue > 0) {
+            setImpactMessage(`¡Atención! Con este gasto, los costos del día (${formatCurrencyCOP(newTotalExpenses)}) superan los ingresos (${formatCurrencyCOP(dayRevenue)}).`);
+        } else {
+             setImpactMessage(`¡Atención! Se está registrando un gasto de ${formatCurrencyCOP(newTotalExpenses)} en un día sin ingresos reportados.`);
+        }
+    } else {
+      setImpactMessage(null);
+    }
+
+  }, [watchedDate, watchedAmount, getRevenueEntryByDate, allExpenses, settings, editingExpense]);
 
 
   const processSubmit = (data: ExpenseFormValues) => {
@@ -126,10 +167,7 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
                 render={({ field }) => (
                   <DatePicker
                     date={field.value}
-                    setDate={(date) => {
-                      field.onChange(date);
-                      setSelectedDate(date);
-                    }}
+                    setDate={(date) => field.onChange(date)}
                     disabled={(date) => {
                       if (!clientToday) return true;
                       return date > clientToday || date < new Date("2020-01-01");
@@ -202,6 +240,13 @@ export function ExpenseEntryForm({ onSubmitSuccess, editingExpense, onCancelEdit
               />
               {errors.description && <p className="text-sm text-destructive">{errors.description.message}</p>}
             </div>
+
+            {impactMessage && (
+                <div className="flex items-start gap-3 p-3 text-sm text-destructive-foreground bg-destructive/90 rounded-md">
+                    <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                    <p>{impactMessage}</p>
+                </div>
+            )}
 
         </CardContent>
         <CardFooter className="flex gap-4">
