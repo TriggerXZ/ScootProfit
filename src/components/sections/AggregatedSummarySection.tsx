@@ -89,7 +89,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       )}
                       <div>
                         <div className={`text-xl font-semibold flex items-center justify-end ${isGoalMet ? 'text-green-500' : 'text-red-500'}`}>
-                          {item.finalNetProfit >= 0 ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
+                          {isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
                           {formatCurrencyCOP(item.finalNetProfit)}
                         </div>
                         <div className="text-xs text-muted-foreground">Beneficio Neto del Periodo</div>
