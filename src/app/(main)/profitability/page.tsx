@@ -150,6 +150,7 @@ export default function ProfitabilityPage() {
                             const expenseDate = parseISO(e.date);
                             return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
                         })} 
+                        totalFixedCosts={monthlyProfitabilityData.deductionsDetail.totalDeductions}
                     />
                 </CardContent>
             </Card>

@@ -11,7 +11,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  CartesianGrid
+  CartesianGrid,
+  ReferenceLine
 } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import type { RevenueEntry, Expense } from '@/types';
@@ -24,9 +25,10 @@ import { useSettings } from '@/hooks/useSettings';
 interface ProfitabilityChartProps {
   revenueEntries: RevenueEntry[];
   expenses: Expense[];
+  totalFixedCosts: number;
 }
 
-export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityChartProps) {
+export function ProfitabilityChart({ revenueEntries, expenses, totalFixedCosts }: ProfitabilityChartProps) {
   const { settings, isLoading: isLoadingSettings } = useSettings();
 
   const chartData = React.useMemo(() => {
@@ -48,31 +50,38 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
         expenseMap.set(expense.date, (expenseMap.get(expense.date) || 0) + expense.amount);
     });
 
+    let cumulativeRevenue = 0;
     return allDaysInMonth.map(date => {
         const dateString = format(date, 'yyyy-MM-dd');
         const revenue = revenueMap.get(dateString) || 0;
         const expense = expenseMap.get(dateString) || 0;
+        cumulativeRevenue += revenue;
         return {
             name: format(date, 'd', { locale: es }),
             Ingresos: revenue,
             Gastos: expense,
             Neto: revenue - expense,
+            'Ingreso Acumulado': cumulativeRevenue,
         };
     });
   }, [revenueEntries, expenses, settings, isLoadingSettings]);
   
   const chartConfig = {
     Ingresos: {
-      label: 'Ingresos',
+      label: 'Ingresos Diarios',
       color: 'hsl(var(--chart-1))',
     },
     Gastos: {
-      label: 'Gastos',
+      label: 'Gastos Diarios',
       color: 'hsl(var(--chart-3))',
     },
-    Neto: {
-        label: 'Neto',
+    'Ingreso Acumulado': {
+        label: 'Ingreso Acumulado',
         color: 'hsl(var(--chart-2))',
+    },
+    'Costos Fijos': {
+        label: 'Costos Fijos (Punto de Equilibrio)',
+        color: 'hsl(var(--chart-4))'
     }
   };
 
@@ -97,11 +106,21 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
                 axisLine={false}
             />
             <YAxis
+                yAxisId="left"
                 stroke="hsl(var(--muted-foreground))"
                 fontSize={12}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `${formatCurrencyCOP(Number(value) / 1000)}k`}
+            />
+            <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke="hsl(var(--muted-foreground))"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) => `${formatCurrencyCOP(Number(value) / 1000000)}M`}
             />
             <Tooltip
                 content={
@@ -118,13 +137,14 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
                 }
             />
             <Legend />
-            <Bar dataKey="Ingresos" fill="var(--color-Ingresos)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="Gastos" fill="var(--color-Gastos)" radius={[4, 4, 0, 0]} />
-            <Line type="monotone" dataKey="Neto" stroke="var(--color-Neto)" strokeWidth={2} dot={false} />
+            <ReferenceLine y={totalFixedCosts} yAxisId="right" stroke="hsl(var(--chart-4))" strokeDasharray="3 3" strokeWidth={2}>
+                 <Legend payload={[{ value: 'Costos Fijos', type: 'line', color: 'hsl(var(--chart-4))' }]} />
+            </ReferenceLine>
+            <Bar yAxisId="left" dataKey="Ingresos" fill="var(--color-Ingresos)" radius={[4, 4, 0, 0]} />
+            <Bar yAxisId="left" dataKey="Gastos" fill="var(--color-Gastos)" radius={[4, 4, 0, 0]} />
+            <Line yAxisId="right" type="monotone" dataKey="Ingreso Acumulado" stroke="var(--color-Ingreso Acumulado)" strokeWidth={2} dot={false} />
         </ComposedChart>
       </ResponsiveContainer>
     </ChartContainer>
   );
 }
-
-    
