@@ -74,8 +74,8 @@ export default function ProfitabilityPage() {
     if (isLoading) {
       return (
         <div className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
           <Skeleton className="h-80 rounded-lg" />
         </div>
@@ -100,12 +100,11 @@ export default function ProfitabilityPage() {
         totalVariableExpenses, 
         finalNetProfit 
     } = monthlyProfitabilityData;
-    const totalExpenses = deductionsDetail.totalDeductions + totalVariableExpenses;
     const isProfitable = finalNetProfit >= 0;
 
     return (
         <div className="space-y-8">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                  <StatCard
                     title="Ingresos Brutos Totales"
                     value={formatCurrencyCOP(totalRevenueInPeriod)}
@@ -115,12 +114,20 @@ export default function ProfitabilityPage() {
                     comparisonValue={previousMonthlyData?.totalRevenueInPeriod}
                 />
                  <StatCard
-                    title="Gastos Totales (Fijos + Variables)"
-                    value={formatCurrencyCOP(totalExpenses)}
+                    title="Costos Fijos Totales"
+                    value={formatCurrencyCOP(deductionsDetail.totalDeductions)}
                     icon={TrendingDown}
-                    description={`${formatCurrencyCOP(deductionsDetail.totalDeductions)} (fijos) + ${formatCurrencyCOP(totalVariableExpenses)} (variables)`}
+                    description="Deducciones (Zona Segura, Arriendo, etc.)"
                     valueClassName="text-red-500"
-                    comparisonValue={previousMonthlyData ? (previousMonthlyData.deductionsDetail.totalDeductions + previousMonthlyData.totalVariableExpenses) : undefined}
+                    comparisonValue={previousMonthlyData?.deductionsDetail.totalDeductions}
+                />
+                 <StatCard
+                    title="Gastos Variables Totales"
+                    value={formatCurrencyCOP(totalVariableExpenses)}
+                    icon={TrendingDown}
+                    description="Reparaciones, combustible, etc."
+                    valueClassName="text-red-500"
+                    comparisonValue={previousMonthlyData?.totalVariableExpenses}
                 />
                  <StatCard
                     title={isProfitable ? 'Beneficio Neto (Ganancia)' : 'Pérdida Neta'}
