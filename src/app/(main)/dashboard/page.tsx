@@ -28,6 +28,8 @@ import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import { useSettings } from '@/hooks/useSettings';
 import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users } from 'lucide-react';
+import { TopPerformerCard } from '@/components/cards/TopPerformerCard';
+import { GROUPS, LOCATIONS } from '@/lib/constants';
 
 
 export default function DashboardPage() {
@@ -68,6 +70,40 @@ export default function DashboardPage() {
     const previous = totals.length > 1 ? totals[1] : null;
     return { currentMonthData: current, previousMonthData: previous };
   }, [all28DayTotals, isLoading, entries, expenses]);
+
+  const topPerformers = useMemo(() => {
+    if (!currentMonthData) return { topGroup: null, topLocation: null };
+
+    const { groupRevenueTotals, entries: periodEntries } = currentMonthData;
+
+    // Find top group
+    let topGroup = { name: 'N/A', total: 0 };
+    if (groupRevenueTotals && Object.keys(groupRevenueTotals).length > 0) {
+      const topGroupId = Object.entries(groupRevenueTotals).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+      topGroup = {
+        name: (Object.values(GROUPS).find(g => g.id === topGroupId))?.name || topGroupId,
+        total: groupRevenueTotals[topGroupId as keyof typeof groupRevenueTotals],
+      };
+    }
+
+    // Find top location
+    let topLocation = { name: 'N/A', total: 0 };
+    if (periodEntries && periodEntries.length > 0) {
+      const locationTotals: { [key: string]: number } = {};
+      periodEntries.forEach(entry => {
+        for (const [loc, revenue] of Object.entries(entry.revenues)) {
+          locationTotals[loc] = (locationTotals[loc] || 0) + revenue;
+        }
+      });
+      const topLocationId = Object.entries(locationTotals).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+      topLocation = {
+        name: (Object.values(LOCATIONS).find(l => l.id === topLocationId))?.name || topLocationId,
+        total: locationTotals[topLocationId],
+      };
+    }
+    
+    return { topGroup, topLocation };
+  }, [currentMonthData]);
 
   const dailyExpensesTotal = useMemo(() => {
       if (!selectedDate) return 0;
@@ -209,6 +245,11 @@ export default function DashboardPage() {
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
+          <TopPerformerCard
+            topGroup={topPerformers.topGroup}
+            topLocation={topPerformers.topLocation}
+            periodLabel={currentMonthData?.period}
+          />
           <GoalProgressCard currentPeriod={currentMonthData} />
           <Card className="shadow-lg">
             <CardHeader>
