@@ -6,16 +6,16 @@ import { ExpenseEntryForm } from '@/components/forms/ExpenseEntryForm';
 import { RecentExpensesTable } from '@/components/sections/RecentExpensesTable';
 import { useExpenses } from '@/hooks/useExpenses';
 import type { Expense } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, WalletCards, TrendingDown } from 'lucide-react';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportExpensesToCSV } from '@/lib/csvExport';
 import { EXPENSE_CATEGORIES } from '@/lib/constants';
-import { formatDate } from '@/lib/formatters';
+import { formatDate, formatCurrencyCOP } from '@/lib/formatters';
 
 export default function ExpenseEntryPage() {
   const { expenses, addExpense, deleteExpense, refreshExpenses } = useExpenses();
@@ -62,6 +62,31 @@ export default function ExpenseEntryPage() {
       return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
     });
   }, [expenses, selectedMonth, selectedYear, isClient]);
+
+  const { totalMonthlyExpenses, topCategory } = useMemo(() => {
+    if (filteredExpenses.length === 0) {
+        return { totalMonthlyExpenses: 0, topCategory: null };
+    }
+    
+    const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+    const categoryTotals = filteredExpenses.reduce((acc, expense) => {
+        acc[expense.categoryId] = (acc[expense.categoryId] || 0) + expense.amount;
+        return acc;
+    }, {} as { [key: string]: number });
+
+    let topCat: { name: string; amount: number } | null = null;
+    if (Object.keys(categoryTotals).length > 0) {
+        const topCategoryId = Object.entries(categoryTotals).reduce((a, b) => a[1] > b[1] ? a : b)[0];
+        topCat = {
+            name: EXPENSE_CATEGORIES.find(c => c.id === topCategoryId)?.name || 'Desconocida',
+            amount: categoryTotals[topCategoryId]
+        };
+    }
+
+    return { totalMonthlyExpenses: total, topCategory: topCat };
+  }, [filteredExpenses]);
+
 
   const yearOptions = useMemo(() => {
     if (!isClient || expenses.length === 0) return [currentYear];
@@ -146,6 +171,40 @@ export default function ExpenseEntryPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
+      <Card className="shadow-xl">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <WalletCards className="h-7 w-7 text-primary" />
+            <div>
+              <CardTitle className="font-headline text-2xl">Resumen de Gastos del Mes</CardTitle>
+              <CardDescription>
+                {new Date(selectedYear, selectedMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())}
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex flex-col justify-center p-6 bg-muted/50 rounded-lg">
+            <h3 className="text-sm font-medium text-muted-foreground">Total Gastado en el Mes</h3>
+            <p className="text-4xl font-bold font-headline text-destructive">{formatCurrencyCOP(totalMonthlyExpenses)}</p>
+          </div>
+          <div className="flex flex-col justify-center p-6 bg-muted/50 rounded-lg">
+            {topCategory ? (
+              <>
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <TrendingDown className="h-4 w-4" />
+                  Categoría Principal de Gasto
+                </h3>
+                <p className="text-2xl font-bold font-headline text-foreground">{topCategory.name}</p>
+                <p className="text-lg font-semibold text-red-500">{formatCurrencyCOP(topCategory.amount)}</p>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-center">No hay gastos para analizar la categoría principal.</p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <ExpenseEntryForm 
         onSubmitSuccess={handleSubmitSuccess}
         editingExpense={editingExpense}
