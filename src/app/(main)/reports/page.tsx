@@ -20,6 +20,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getGroupForLocationOnDate } from '@/lib/calculations';
 
 type TranslatedAnalysis = {
     executiveSummary?: string;
@@ -40,6 +41,7 @@ export default function ReportsPage() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
 
+  const [filterType, setFilterType] = useState<'monthly' | 'allTime'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
@@ -69,35 +71,36 @@ export default function ReportsPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const filteredEntries = useMemo(() => {
-    return entries.filter(entry => {
-      const entryDate = parseISO(entry.date);
-      return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
-    });
-  }, [entries, selectedMonth, selectedYear]);
-
   const { groupTotals, locationTotals } = useMemo(() => {
-    const groupMap: { [key: string]: number } = {};
-    const locationMap: { [key: string]: number } = {};
+      const groupMap: { [key: string]: number } = {};
+      const locationMap: { [key: string]: number } = {};
 
-    const totalsFromHook = allCalendarMonthlyTotals(expenses);
-    const relevantTotals = totalsFromHook.find(t => {
-        if(t.entries.length === 0) return false;
-        const entryDate = parseISO(t.entries[0].date);
-        return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
-    });
+      let entriesToAnalyze: RevenueEntry[] = [];
 
-    if (relevantTotals) {
-        Object.assign(groupMap, relevantTotals.groupRevenueTotals);
-        relevantTotals.entries.forEach(entry => {
-            for (const [location, revenue] of Object.entries(entry.revenues)) {
-                locationMap[location] = (locationMap[location] || 0) + revenue;
-            }
-        });
-    }
+      if (filterType === 'allTime') {
+          entriesToAnalyze = entries;
+      } else {
+          entriesToAnalyze = entries.filter(entry => {
+              const entryDate = parseISO(entry.date);
+              return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
+          });
+      }
 
-    return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [expenses, allCalendarMonthlyTotals, selectedMonth, selectedYear]);
+      entriesToAnalyze.forEach(entry => {
+          const entryDate = parseISO(entry.date);
+          // Aggregate location totals
+          for (const [location, revenue] of Object.entries(entry.revenues)) {
+              locationMap[location] = (locationMap[location] || 0) + revenue;
+          }
+          // Aggregate group totals
+          for (const [locationId, revenue] of Object.entries(entry.revenues)) {
+              const group = getGroupForLocationOnDate(locationId as any, entryDate);
+              groupMap[group] = (groupMap[group] || 0) + revenue;
+          }
+      });
+
+      return { groupTotals: groupMap, locationTotals: locationMap };
+  }, [entries, filterType, selectedMonth, selectedYear]);
   
   const isLoading = isLoadingRevenues || isLoadingExpenses;
 
@@ -289,34 +292,48 @@ export default function ReportsPage() {
                 <BarChart2 className="h-6 w-6 text-primary" />
                 <CardTitle className="font-headline text-2xl">Análisis de Rendimiento</CardTitle>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-                <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Seleccionar mes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {monthOptions.map(month => (
-                            <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
-                    <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Seleccionar año" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {yearOptions.map(year => (
-                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+             <div className="flex items-center gap-2 flex-wrap">
+                 <Tabs value={filterType} onValueChange={(value) => setFilterType(value as 'monthly' | 'allTime')} className="w-full sm:w-auto">
+                    <TabsList className="grid w-full grid-cols-2">
+                        <TabsTrigger value="monthly">Mensual</TabsTrigger>
+                        <TabsTrigger value="allTime">Histórico</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                {filterType === 'monthly' && (
+                    <>
+                        <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Seleccionar mes" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {monthOptions.map(month => (
+                                    <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+                            <SelectTrigger className="w-[120px]">
+                                <SelectValue placeholder="Seleccionar año" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {yearOptions.map(year => (
+                                    <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </>
+                )}
                 <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading || Object.keys(groupTotals).length === 0}>
                     <BrainCircuit className="mr-2 h-4 w-4" />
                     Analizar con IA
                 </Button>
             </div>
           </div>
-          <CardDescription>Visualiza los ingresos acumulados por grupo y ubicación para el período seleccionado.</CardDescription>
+          <CardDescription>
+            {filterType === 'monthly'
+                ? 'Visualiza los ingresos acumulados por grupo y ubicación para el período seleccionado.'
+                : 'Visualiza el rendimiento histórico total por grupo y ubicación.'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2 pt-4">
           <div className="h-80">
@@ -473,3 +490,5 @@ export default function ReportsPage() {
     </div>
   );
 }
+
+    
