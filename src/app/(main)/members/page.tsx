@@ -9,30 +9,16 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useSettings } from '@/hooks/useSettings';
 import { formatCurrencyCOP } from '@/lib/formatters';
-import { getMonth, getYear, parseISO } from 'date-fns';
-import { Users, LineChart, TrendingUp, TrendingDown, Scale, AlertTriangle } from 'lucide-react';
+import { getMonth, getYear, parseISO, subMonths } from 'date-fns';
+import { Users, TrendingUp, TrendingDown, Scale, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatCard } from '@/components/cards/StatCard';
 import type { AggregatedTotal } from '@/types';
-
-function StatCardMember({ title, value, icon: Icon, description, valueClassName }: { title: string; value: string; icon: React.ElementType; description: string, valueClassName?: string }) {
-    return (
-        <Card className="shadow-lg">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-                <Icon className="h-5 w-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className={`text-3xl font-bold font-headline ${valueClassName}`}>{value}</div>
-                <p className="text-xs text-muted-foreground pt-1">{description}</p>
-            </CardContent>
-        </Card>
-    );
-}
 
 
 export default function MembersPage() {
-  const { allCalendarMonthlyTotals, isLoading: isLoadingRevenues, entries } = useRevenueEntries();
-  const { expenses, isLoading: isLoadingExpenses } = useExpenses();
+  const { allCalendarMonthlyTotals, isLoading: isLoadingRevenues, entries } from useRevenueEntries();
+  const { expenses, isLoading: isLoadingExpenses } from 'useExpenses';
   const { settings, isLoading: isLoadingSettings } = useSettings();
   
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
@@ -64,13 +50,25 @@ export default function MembersPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const monthlyData: AggregatedTotal | undefined = useMemo(() => {
+  const { monthlyData, previousMonthlyData } = useMemo(() => {
     const totals = allCalendarMonthlyTotals(expenses);
-    return totals.find(total => {
+    const currentData = totals.find(total => {
         if (total.entries.length === 0) return false;
         const periodDate = parseISO(total.entries[0].date);
         return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
     });
+
+    const previousMonthDate = subMonths(new Date(selectedYear, selectedMonth), 1);
+    const previousMonth = getMonth(previousMonthDate);
+    const previousYear = getYear(previousMonthDate);
+
+    const previousData = totals.find(total => {
+        if (total.entries.length === 0) return false;
+        const periodDate = parseISO(total.entries[0].date);
+        return getMonth(periodDate) === previousMonth && getYear(periodDate) === previousYear;
+    });
+    
+    return { monthlyData: currentData, previousMonthlyData: previousData };
   }, [allCalendarMonthlyTotals, expenses, selectedMonth, selectedYear]);
 
   const isLoading = isLoadingRevenues || isLoadingExpenses || isLoadingSettings;
@@ -79,8 +77,8 @@ export default function MembersPage() {
     if (isLoading) {
       return (
         <div className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3">
-            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
           <Skeleton className="h-80 rounded-lg" />
         </div>
@@ -103,32 +101,46 @@ export default function MembersPage() {
     const grossRevenuePerMember = numberOfMembers > 0 ? monthlyData.totalRevenueInPeriod / numberOfMembers : 0;
     const fixedCostPerMember = numberOfMembers > 0 ? monthlyData.deductionsDetail.totalDeductions / numberOfMembers : 0;
     const variableCostPerMember = numberOfMembers > 0 ? monthlyData.totalVariableExpenses / numberOfMembers : 0;
-    const totalCostPerMember = fixedCostPerMember + variableCostPerMember;
     const netProfitPerMember = monthlyData.netMemberShare;
+
+    const prevGrossRevenuePerMember = previousMonthlyData && numberOfMembers > 0 ? previousMonthlyData.totalRevenueInPeriod / numberOfMembers : 0;
+    const prevFixedCostPerMember = previousMonthlyData && numberOfMembers > 0 ? previousMonthlyData.deductionsDetail.totalDeductions / numberOfMembers : 0;
+    const prevVariableCostPerMember = previousMonthlyData && numberOfMembers > 0 ? previousMonthlyData.totalVariableExpenses / numberOfMembers : 0;
 
     return (
         <div className="space-y-8">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                 <StatCardMember
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                 <StatCard
                     title="Ingreso Bruto por Miembro"
                     value={formatCurrencyCOP(grossRevenuePerMember)}
                     icon={TrendingUp}
-                    description="Promedio de ingresos generados por cada miembro."
+                    description="Ingresos generados por miembro."
                     valueClassName="text-green-500"
+                    comparisonValue={prevGrossRevenuePerMember}
                 />
-                 <StatCardMember
-                    title="Costo Total por Miembro"
-                    value={formatCurrencyCOP(totalCostPerMember)}
+                 <StatCard
+                    title="Costos Fijos por Miembro"
+                    value={formatCurrencyCOP(fixedCostPerMember)}
                     icon={TrendingDown}
-                    description="Suma de costos fijos y variables por miembro."
+                    description="Deducciones (Arriendo, etc.)"
                      valueClassName="text-red-500"
+                     comparisonValue={prevFixedCostPerMember}
                 />
-                <StatCardMember
+                 <StatCard
+                    title="Gastos Variables por Miembro"
+                    value={formatCurrencyCOP(variableCostPerMember)}
+                    icon={TrendingDown}
+                    description="Reparaciones, combustible, etc."
+                     valueClassName="text-red-500"
+                     comparisonValue={prevVariableCostPerMember}
+                />
+                <StatCard
                     title="Beneficio Neto por Miembro"
                     value={formatCurrencyCOP(netProfitPerMember)}
                     icon={Scale}
-                    description="Ganancia final por miembro después de todos los costos."
+                    description="Ganancia final por miembro."
                     valueClassName={netProfitPerMember >= 0 ? 'text-primary' : 'text-destructive'}
+                    comparisonValue={previousMonthlyData?.netMemberShare}
                 />
             </div>
             <Card className="shadow-xl">
@@ -236,5 +248,3 @@ export default function MembersPage() {
     </div>
   );
 }
-
-    
