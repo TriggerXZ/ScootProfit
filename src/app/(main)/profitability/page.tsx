@@ -8,10 +8,11 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import type { AggregatedTotal, Expense } from '@/types';
 import { formatCurrencyCOP } from '@/lib/formatters';
-import { getMonth, getYear, parseISO } from 'date-fns';
-import { LineChart, DollarSign, TrendingDown, TrendingUp, AlertTriangle } from 'lucide-react';
+import { getMonth, getYear, parseISO, subMonths } from 'date-fns';
+import { LineChart, DollarSign, TrendingDown, TrendingUp, AlertTriangle, Scale } from 'lucide-react';
 import { ProfitabilityChart } from '@/components/charts/ProfitabilityChart';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatCard } from '@/components/cards/StatCard';
 
 export default function ProfitabilityPage() {
   const { entries, allCalendarMonthlyTotals, isLoading: isLoadingRevenues } = useRevenueEntries();
@@ -46,13 +47,25 @@ export default function ProfitabilityPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const monthlyProfitabilityData = useMemo(() => {
+  const { monthlyProfitabilityData, previousMonthlyData } = useMemo(() => {
     const totals = allCalendarMonthlyTotals(expenses);
-    return totals.find(total => {
+    const currentData = totals.find(total => {
         if (total.entries.length === 0) return false;
         const periodDate = parseISO(total.entries[0].date);
         return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
     });
+
+    const previousMonthDate = subMonths(new Date(selectedYear, selectedMonth), 1);
+    const previousMonth = getMonth(previousMonthDate);
+    const previousYear = getYear(previousMonthDate);
+
+    const previousData = totals.find(total => {
+        if (total.entries.length === 0) return false;
+        const periodDate = parseISO(total.entries[0].date);
+        return getMonth(periodDate) === previousMonth && getYear(periodDate) === previousYear;
+    });
+    
+    return { monthlyProfitabilityData: currentData, previousMonthlyData: previousData };
   }, [allCalendarMonthlyTotals, expenses, selectedMonth, selectedYear]);
 
   const isLoading = isLoadingRevenues || isLoadingExpenses;
@@ -61,8 +74,8 @@ export default function ProfitabilityPage() {
     if (isLoading) {
       return (
         <div className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}
           </div>
           <Skeleton className="h-80 rounded-lg" />
         </div>
@@ -92,41 +105,31 @@ export default function ProfitabilityPage() {
 
     return (
         <div className="space-y-8">
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                 <Card className="shadow-lg">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Ingresos Brutos Totales</CardTitle>
-                        <TrendingUp className="h-5 w-5 text-green-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold font-headline text-green-500">{formatCurrencyCOP(totalRevenueInPeriod)}</div>
-                        <p className="text-xs text-muted-foreground pt-1">Total facturado en el período</p>
-                    </CardContent>
-                </Card>
-                 <Card className="shadow-lg">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Gastos Totales (Fijos + Variables)</CardTitle>
-                        <TrendingDown className="h-5 w-5 text-red-500" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold font-headline text-red-500">{formatCurrencyCOP(totalExpenses)}</div>
-                        <p className="text-xs text-muted-foreground pt-1">
-                            {formatCurrencyCOP(deductionsDetail.totalDeductions)} (fijos) + {formatCurrencyCOP(totalVariableExpenses)} (variables)
-                        </p>
-                    </CardContent>
-                </Card>
-                <Card className={`shadow-xl lg:col-span-2 border-2 ${isProfitable ? 'border-primary' : 'border-destructive'}`}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-base font-semibold">{isProfitable ? 'Beneficio Neto (Ganancia)' : 'Pérdida Neta'}</CardTitle>
-                        <DollarSign className={`h-6 w-6 ${isProfitable ? 'text-primary' : 'text-destructive'}`} />
-                    </CardHeader>
-                    <CardContent>
-                        <div className={`text-5xl font-bold font-headline ${isProfitable ? 'text-primary' : 'text-destructive'}`}>
-                            {formatCurrencyCOP(finalNetProfit)}
-                        </div>
-                        <p className="text-sm text-muted-foreground pt-1">Resultado final después de todos los costos.</p>
-                    </CardContent>
-                </Card>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                 <StatCard
+                    title="Ingresos Brutos Totales"
+                    value={formatCurrencyCOP(totalRevenueInPeriod)}
+                    icon={TrendingUp}
+                    description="Total facturado en el período."
+                    valueClassName="text-green-500"
+                    comparisonValue={previousMonthlyData?.totalRevenueInPeriod}
+                />
+                 <StatCard
+                    title="Gastos Totales (Fijos + Variables)"
+                    value={formatCurrencyCOP(totalExpenses)}
+                    icon={TrendingDown}
+                    description={`${formatCurrencyCOP(deductionsDetail.totalDeductions)} (fijos) + ${formatCurrencyCOP(totalVariableExpenses)} (variables)`}
+                    valueClassName="text-red-500"
+                    comparisonValue={previousMonthlyData ? (previousMonthlyData.deductionsDetail.totalDeductions + previousMonthlyData.totalVariableExpenses) : undefined}
+                />
+                 <StatCard
+                    title={isProfitable ? 'Beneficio Neto (Ganancia)' : 'Pérdida Neta'}
+                    value={formatCurrencyCOP(finalNetProfit)}
+                    icon={Scale}
+                    description="Resultado final después de todos los costos."
+                    valueClassName={isProfitable ? 'text-primary' : 'text-destructive'}
+                    comparisonValue={previousMonthlyData?.finalNetProfit}
+                />
             </div>
             <Card className="shadow-xl">
                 <CardHeader>
