@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -15,7 +15,8 @@ import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Coins } from 'lucide-react';
+import { Coins, Sigma } from 'lucide-react';
+import { formatCurrencyCOP } from '@/lib/formatters';
 
 const revenueSchema = z.string().refine(val => !isNaN(parseFloat(val.replace(/\./g, ''))) && parseFloat(val.replace(/\./g, '')) >= 0, {
   message: "Debe ser un número positivo"
@@ -54,7 +55,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
   const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
 
-  const { control, handleSubmit, reset, setValue, formState: { errors, isSubmitting } } = useForm<RevenueFormValues>({
+  const { control, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<RevenueFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       date: undefined,
@@ -64,6 +65,15 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
       la78: "0",
     },
   });
+
+  const watchedRevenues = watch(LOCATION_IDS);
+
+  const dailyTotal = useMemo(() => {
+    return watchedRevenues.reduce((sum, value) => {
+      const parsedValue = parseFloat(parseInputValue(value || "0"));
+      return sum + (isNaN(parsedValue) ? 0 : parsedValue);
+    }, 0);
+  }, [watchedRevenues]);
 
   useEffect(() => {
     const today = new Date();
@@ -206,6 +216,17 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
               </div>
             ))}
           </div>
+
+          <div className="pt-4 mt-2">
+             <div className="flex items-center justify-between p-4 bg-muted/70 rounded-lg border">
+                <div className="flex items-center gap-3">
+                    <Sigma className="h-6 w-6 text-primary" />
+                    <span className="font-semibold text-lg text-foreground">Total del Día</span>
+                </div>
+                <span className="font-bold text-2xl text-primary font-headline">{formatCurrencyCOP(dailyTotal)}</span>
+            </div>
+          </div>
+
         </CardContent>
         <CardFooter className="flex gap-4">
             {editingEntry && (
