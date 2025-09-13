@@ -58,23 +58,11 @@ export function useRevenueEntries() {
     return fetchEntryById(date);
   }, []);
   
-  const getDailySummary = useCallback((date: Date): AggregatedTotal | null => {
+  const getDailySummary = useCallback((date: Date): ReturnType<typeof calculateDailyTotal> | null => {
     const dateString = format(date, 'yyyy-MM-dd');
     const entryForDay = entries.find(e => e.date === dateString);
     if (!entryForDay) return null;
-    const dailyTotal = calculateDailyTotal(entryForDay);
-    // Wrap it in a simple AggregatedTotal-like structure for consistency if needed, or return DailyTotal
-    return {
-        period: dateString,
-        totalRevenueInPeriod: dailyTotal.total,
-        grossMemberShare: dailyTotal.memberShare,
-        deductionsDetail: { zonaSegura: 0, arriendo: 0, aporteCooperativa: 0, totalDeductions: 0 },
-        netRevenueToDistribute: dailyTotal.total,
-        netMemberShare: dailyTotal.memberShare,
-        groupRevenueTotals: {} as any, // Not calculated for single day summary
-        entries: [entryForDay],
-        numberOfMembers: 0, // Placeholder
-    };
+    return calculateDailyTotal(entryForDay);
   }, [entries]);
 
   const allWeeklyTotals = useCallback((): AggregatedTotal[] => {
