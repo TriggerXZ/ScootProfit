@@ -27,6 +27,7 @@ import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
 import { calculateDailyTotal } from '@/lib/calculations';
 import { Edit, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useSettings } from '@/hooks/useSettings';
 
 interface RecentEntriesTableProps {
   entries: RevenueEntry[];
@@ -37,6 +38,7 @@ interface RecentEntriesTableProps {
 export function RecentEntriesTable({ entries, onEdit, onDelete }: RecentEntriesTableProps) {
     const [entryToDelete, setEntryToDelete] = useState<RevenueEntry | null>(null);
     const { toast } = useToast();
+    const { settings, isLoading: isLoadingSettings } = useSettings();
 
     const handleDeleteClick = (entry: RevenueEntry) => {
         setEntryToDelete(entry);
@@ -70,7 +72,7 @@ export function RecentEntriesTable({ entries, onEdit, onDelete }: RecentEntriesT
                 </TableHeader>
                 <TableBody>
                     {entries.map((entry) => {
-                        const dailyTotal = calculateDailyTotal(entry);
+                        const dailyTotal = isLoadingSettings ? { total: 0 } : calculateDailyTotal(entry, settings);
                         return (
                             <TableRow key={entry.id}>
                                 <TableCell className="font-medium">{formatDate(entry.date, 'PPP')}</TableCell>
@@ -114,3 +116,5 @@ export function RecentEntriesTable({ entries, onEdit, onDelete }: RecentEntriesT
     </>
   );
 }
+
+    

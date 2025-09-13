@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, ReceiptText, LineChart } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings, ReceiptText, LineChart, Users } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/expenses', label: 'Registrar Gastos', icon: ReceiptText },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
   { href: '/profitability', label: 'Rentabilidad', icon: LineChart },
+  { href: '/members', label: 'Miembros', icon: Users },
 ];
 
 export function SidebarNav() {
@@ -65,3 +66,5 @@ export function SidebarNav() {
     </SidebarMenu>
   );
 }
+
+    

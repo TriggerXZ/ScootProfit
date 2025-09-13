@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import type { AggregatedTotal } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -12,57 +12,23 @@ import {
   LOCATION_IDS, 
   GROUPS,
   GROUP_IDS,
-  LOCAL_STORAGE_SETTINGS_KEY,
-  DEFAULT_WEEKLY_GOAL,
-  DEFAULT_MONTHLY_GOAL,
 } from '@/lib/constants';
 import { calculateLocationTotalsForPeriod } from '@/lib/calculations';
-import { CalendarDays, MapPin, FileText, AlertCircle, Group, TrendingUp, TrendingDown, Package, Banknote, Users } from 'lucide-react';
+import { CalendarDays, MapPin, FileText, AlertCircle, Group, TrendingUp, TrendingDown } from 'lucide-react';
+import { useSettings } from '@/hooks/useSettings';
 
-interface AggregatedSummarySectionProps {
+
+export function AggregatedSummarySection({ title, totals, isLoading, onDownloadInvoice }: {
   title: string;
   totals: AggregatedTotal[];
   isLoading: boolean;
   onDownloadInvoice: (item: AggregatedTotal) => void;
-}
-
-function getGoalsFromSettings(): { weeklyGoal: number, monthlyGoal: number } {
-    if (typeof window === 'undefined') {
-        return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
-    }
-    const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
-    if (storedSettings) {
-        try {
-            const parsed = JSON.parse(storedSettings);
-            return {
-                weeklyGoal: parsed.weeklyGoal || DEFAULT_WEEKLY_GOAL,
-                monthlyGoal: parsed.monthlyGoal || DEFAULT_MONTHLY_GOAL
-            };
-        } catch (e) {
-             return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
-        }
-    }
-    return { weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL };
-}
-
-
-export function AggregatedSummarySection({ title, totals, isLoading, onDownloadInvoice }: AggregatedSummarySectionProps) {
-  const [goals, setGoals] = useState({ weeklyGoal: DEFAULT_WEEKLY_GOAL, monthlyGoal: DEFAULT_MONTHLY_GOAL });
-
-  useEffect(() => {
-    setGoals(getGoalsFromSettings());
-    
-    const handleStorageChange = () => {
-        setGoals(getGoalsFromSettings());
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-        window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
+}) {
+  const { settings, isLoading: isLoadingSettings } = useSettings();
   
-  if (isLoading) {
+  const finalIsLoading = isLoading || isLoadingSettings;
+
+  if (finalIsLoading) {
     return (
       <Card>
         <CardHeader>
@@ -103,7 +69,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
           {totals.map((item, index) => {
             const locationTotalsInPeriod = calculateLocationTotalsForPeriod(item.entries);
             const isWeeklyReport = title.toLowerCase().includes('semanal');
-            const goal = isWeeklyReport ? goals.weeklyGoal : goals.monthlyGoal;
+            const goal = isWeeklyReport ? settings.weeklyGoal : settings.monthlyGoal;
             const isGoalMet = item.totalRevenueInPeriod >= goal;
 
             return (
@@ -228,3 +194,5 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
     </Card>
   );
 }
+
+    

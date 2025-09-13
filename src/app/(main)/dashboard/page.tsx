@@ -9,18 +9,14 @@ import { GoalProgressCard } from '@/components/cards/GoalProgressCard';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
-import { calculateDailyTotal } from '@/lib/calculations';
-import { LOCATIONS, LOCATION_IDS } from '@/lib/constants';
-import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit, Languages, TrendingDown, Scale } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 import {
   AlertDialog,
   AlertDialogAction,
-  AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
@@ -30,14 +26,17 @@ import {
 import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/predict-income-flow';
 import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { translateText } from '@/ai/flows/translate-text-flow';
-import type { AggregatedTotal } from '@/types';
+import { useSettings } from '@/hooks/useSettings';
+import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users } from 'lucide-react';
+
 
 export default function DashboardPage() {
   const { entries, isLoading: isLoadingRevenues, all28DayTotals, getDailySummary, refreshEntries } = useRevenueEntries();
-  const { expenses, isLoading: isLoadingExpenses, getExpensesForPeriod } = useExpenses();
+  const { expenses, isLoading: isLoadingExpenses } = useExpenses();
+  const { settings, isLoading: isLoadingSettings } = useSettings();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
+  const [dailySummary, setDailySummary] = useState<ReturnType<typeof getDailySummary> | null>(null);
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
   const [predictionResult, setPredictionResult] = useState<PredictMonthlyIncomeOutput | null>(null);
   const [translatedPrediction, setTranslatedPrediction] = useState<string | null>(null);
@@ -60,7 +59,7 @@ export default function DashboardPage() {
     refreshEntries(); 
   }, [refreshEntries]);
   
-  const isLoading = isLoadingRevenues || isLoadingExpenses;
+  const isLoading = isLoadingRevenues || isLoadingExpenses || isLoadingSettings;
 
   const { currentMonthData, previousMonthData } = useMemo(() => {
     if (isLoading || entries.length === 0) return { currentMonthData: null, previousMonthData: null };
@@ -91,7 +90,7 @@ export default function DashboardPage() {
     setTranslatedPrediction(null);
     setShowPredictionDialog(true);
     try {
-      const historicalData = getHistoricalMonthlyDataString(entries);
+      const historicalData = getHistoricalMonthlyDataString(entries, settings);
       if (historicalData.split(',').length < 2) {
          setPredictionResult({
           estimatedIncome: 0,
@@ -319,3 +318,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

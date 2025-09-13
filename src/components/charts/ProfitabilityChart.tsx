@@ -19,6 +19,7 @@ import { format, parseISO, eachDayOfInterval, startOfMonth, endOfMonth } from 'd
 import { es } from 'date-fns/locale';
 import { calculateDailyTotal } from '@/lib/calculations';
 import { formatCurrencyCOP } from '@/lib/formatters';
+import { useSettings } from '@/hooks/useSettings';
 
 interface ProfitabilityChartProps {
   revenueEntries: RevenueEntry[];
@@ -26,8 +27,10 @@ interface ProfitabilityChartProps {
 }
 
 export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityChartProps) {
+  const { settings, isLoading: isLoadingSettings } = useSettings();
+
   const chartData = React.useMemo(() => {
-    if (revenueEntries.length === 0) return [];
+    if (revenueEntries.length === 0 || isLoadingSettings) return [];
 
     const firstDate = parseISO(revenueEntries[revenueEntries.length - 1].date);
     const monthStart = startOfMonth(firstDate);
@@ -36,7 +39,7 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
     
     const revenueMap = new Map<string, number>();
     revenueEntries.forEach(entry => {
-        const total = calculateDailyTotal(entry).total;
+        const total = calculateDailyTotal(entry, settings).total;
         revenueMap.set(entry.date, (revenueMap.get(entry.date) || 0) + total);
     });
 
@@ -56,7 +59,7 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
             Neto: revenue - expense,
         };
     });
-  }, [revenueEntries, expenses]);
+  }, [revenueEntries, expenses, settings, isLoadingSettings]);
   
   const chartConfig = {
     Ingresos: {
@@ -123,3 +126,5 @@ export function ProfitabilityChart({ revenueEntries, expenses }: ProfitabilityCh
     </ChartContainer>
   );
 }
+
+    

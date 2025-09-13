@@ -1,19 +1,15 @@
 
 import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue, Expense } from '@/types';
 import { 
-  LOCAL_STORAGE_SETTINGS_KEY,
   LOCATION_IDS, 
   LocationId,
-  DEFAULT_NUMBER_OF_MEMBERS, 
-  DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-  DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
   ROTATION_START_DATE,
   INITIAL_ROTATION_ASSIGNMENT,
 } from './constants';
 import {
   startOfWeek,
   startOfMonth,
+  endOfMonth,
   parseISO,
   format,
   add,
@@ -21,44 +17,8 @@ import {
   isWithinInterval,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { AppSettings } from '@/hooks/useSettings';
 
-
-interface AppSettings {
-  numberOfMembers: number;
-  zonaSeguraDeduction: number;
-  arriendoDeduction: number;
-  cooperativaDeduction: number;
-}
-
-function getAppSettings(): AppSettings {
-  const defaults = {
-    numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
-    zonaSeguraDeduction: DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-    arriendoDeduction: DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-    cooperativaDeduction: DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
-  };
-
-  if (typeof window === 'undefined') {
-    return defaults;
-  }
-
-  const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
-  if (storedSettings) {
-    try {
-      const parsed = JSON.parse(storedSettings);
-      return {
-        numberOfMembers: parsed.numberOfMembers > 0 ? parsed.numberOfMembers : defaults.numberOfMembers,
-        zonaSeguraDeduction: parsed.zonaSeguraDeduction ?? defaults.zonaSeguraDeduction,
-        arriendoDeduction: parsed.arriendoDeduction ?? defaults.arriendoDeduction,
-        cooperativaDeduction: parsed.cooperativaDeduction ?? defaults.cooperativaDeduction,
-      };
-    } catch (e) {
-      console.error("Failed to parse settings from localStorage", e);
-      return defaults;
-    }
-  }
-  return defaults;
-}
 
 export function getGroupForLocationOnDate(locationId: LocationId, date: Date): GroupId {
   const rotationStartDate = startOfWeek(parseISO(ROTATION_START_DATE), { weekStartsOn: 2 /* Tuesday */ });
@@ -75,9 +35,9 @@ export function getGroupForLocationOnDate(locationId: LocationId, date: Date): G
   return INITIAL_ROTATION_ASSIGNMENT[shiftedIndex];
 }
 
-export function calculateDailyTotal(entry: RevenueEntry): DailyTotal {
+export function calculateDailyTotal(entry: RevenueEntry, settings: AppSettings): DailyTotal {
   const total = LOCATION_IDS.reduce((sum, locId) => sum + (entry.revenues[locId] || 0), 0);
-  const { numberOfMembers } = getAppSettings();
+  const { numberOfMembers } = settings;
   return {
     date: entry.date,
     total,
@@ -101,16 +61,17 @@ const calculateAggregatedTotals = (
   periodLabel: string,
   applyDeductionsForThisPeriod: boolean,
   periodExpenses: Expense[],
-  periodInterval: Interval
+  periodInterval: Interval,
+  settings: AppSettings
 ): AggregatedTotal => {
   const { 
     numberOfMembers, 
     zonaSeguraDeduction, 
     arriendoDeduction, 
     cooperativaDeduction 
-  } = getAppSettings();
+  } = settings;
 
-  const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry).total, 0);
+  const totalRevenueInPeriod = periodEntries.reduce((sum, entry) => sum + calculateDailyTotal(entry, settings).total, 0);
 
   const groupRevenueTotals: GroupRevenue = { grupoCubo: 0, grupoLuces: 0, grupo78: 0, grupo72: 0 };
   periodEntries.forEach(entry => {
@@ -165,6 +126,7 @@ const calculateAggregatedTotals = (
 const getPeriodData = (
   allEntries: RevenueEntry[], 
   allExpenses: Expense[],
+  settings: AppSettings,
   getPeriodKeyAndInterval: (date: Date) => { key: string, interval: Interval },
   getPeriodLabel: (date: Date) => string,
   applyDeductionsLogic: (date: Date, entries: RevenueEntry[]) => boolean
@@ -189,11 +151,11 @@ const getPeriodData = (
     const periodLabel = getPeriodLabel(periodStartDateObj);
     const applyDeductions = applyDeductionsLogic(periodStartDateObj, periodEntries);
     
-    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductions, allExpenses, interval);
+    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductions, allExpenses, interval, settings);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 };
 
-export function getWeeklyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+export function getWeeklyTotals(entries: RevenueEntry[], expenses: Expense[], settings: AppSettings): AggregatedTotal[] {
   const rotationStartDate = startOfWeek(parseISO(ROTATION_START_DATE), { weekStartsOn: 2 });
   
   const getPeriodKeyAndInterval = (date: Date) => {
@@ -212,10 +174,10 @@ export function getWeeklyTotals(entries: RevenueEntry[], expenses: Expense[]): A
     return (weekIndex + 1) % 4 === 0;
   };
   
-  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, applyDeductionsLogic);
+  return getPeriodData(entries, expenses, settings, getPeriodKeyAndInterval, getPeriodLabel, applyDeductionsLogic);
 }
 
-export function get28DayTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+export function get28DayTotals(entries: RevenueEntry[], expenses: Expense[], settings: AppSettings): AggregatedTotal[] {
   const rotationStartDate = startOfWeek(parseISO(ROTATION_START_DATE), { weekStartsOn: 2 });
 
   const getPeriodKeyAndInterval = (date: Date) => {
@@ -233,25 +195,25 @@ export function get28DayTotals(entries: RevenueEntry[], expenses: Expense[]): Ag
     return `Periodo del ${format(date, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
   };
   
-  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, () => true);
+  return getPeriodData(entries, expenses, settings, getPeriodKeyAndInterval, getPeriodLabel, () => true);
 }
 
-export function getCalendarMonthlyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+export function getCalendarMonthlyTotals(entries: RevenueEntry[], expenses: Expense[], settings: AppSettings): AggregatedTotal[] {
   const getPeriodKeyAndInterval = (date: Date) => {
     const start = startOfMonth(date);
     return {
         key: format(start, 'yyyy-MM-dd'),
-        interval: { start, end: add(start, { months: 1, days: -1 }) }
+        interval: { start, end: endOfMonth(start) }
     };
   };
 
   const getPeriodLabel = (date: Date) => `Mes de ${format(date, 'MMMM yyyy', { locale: es })}`;
   
-  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, () => true);
+  return getPeriodData(entries, expenses, settings, getPeriodKeyAndInterval, getPeriodLabel, () => true);
 }
 
-export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = get28DayTotals(entries, []); 
+export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings: AppSettings): string {
+  const monthlyTotals = get28DayTotals(entries, [], settings); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries[0].date) : new Date(0);
@@ -263,3 +225,5 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string 
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
+
+    

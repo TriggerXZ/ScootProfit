@@ -10,16 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, DollarSign } from 'lucide-react';
-import { 
-  LOCAL_STORAGE_SETTINGS_KEY, 
-  DEFAULT_NUMBER_OF_MEMBERS, 
-  DEFAULT_MONTHLY_GOAL, 
-  DEFAULT_WEEKLY_GOAL,
-  DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-  DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-  DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
-} from '@/lib/constants';
+import { Settings } from 'lucide-react';
+import { LOCAL_STORAGE_SETTINGS_KEY } from '@/lib/constants';
+import { useSettings } from '@/hooks/useSettings';
+import type { AppSettings } from '@/hooks/useSettings';
 
 const settingsSchema = z.object({
   numberOfMembers: z.number().int().positive("El número debe ser un entero positivo."),
@@ -34,53 +28,22 @@ type SettingsFormValues = z.infer<typeof settingsSchema>;
 
 export default function SettingsPage() {
   const { toast } = useToast();
-  const [currentSettings, setCurrentSettings] = useState({
-    numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
-    monthlyGoal: DEFAULT_MONTHLY_GOAL,
-    weeklyGoal: DEFAULT_WEEKLY_GOAL,
-    zonaSeguraDeduction: DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-    arriendoDeduction: DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-    cooperativaDeduction: DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
-  });
+  const { settings, isLoading, refreshSettings } = useSettings();
 
   const { control, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: currentSettings,
+    defaultValues: settings,
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
-      if (storedSettings) {
-        const parsedSettings = JSON.parse(storedSettings);
-        
-        const mergedSettings = {
-            numberOfMembers: parsedSettings.numberOfMembers || DEFAULT_NUMBER_OF_MEMBERS,
-            monthlyGoal: parsedSettings.monthlyGoal || DEFAULT_MONTHLY_GOAL,
-            weeklyGoal: parsedSettings.weeklyGoal || DEFAULT_WEEKLY_GOAL,
-            zonaSeguraDeduction: parsedSettings.zonaSeguraDeduction ?? DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-            arriendoDeduction: parsedSettings.arriendoDeduction ?? DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-            cooperativaDeduction: parsedSettings.cooperativaDeduction ?? DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
-        };
-
-        setCurrentSettings(mergedSettings);
-        reset(mergedSettings);
-      } else {
-        reset({
-            numberOfMembers: DEFAULT_NUMBER_OF_MEMBERS,
-            monthlyGoal: DEFAULT_MONTHLY_GOAL,
-            weeklyGoal: DEFAULT_WEEKLY_GOAL,
-            zonaSeguraDeduction: DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
-            arriendoDeduction: DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
-            cooperativaDeduction: DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
-        });
-      }
+    if (!isLoading) {
+      reset(settings);
     }
-  }, [reset]);
+  }, [settings, isLoading, reset]);
 
   const processSubmit = (data: SettingsFormValues) => {
     localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(data));
-    setCurrentSettings(data);
+    refreshSettings(); // Refresh the settings in the hook
     toast({
       title: "Configuración Guardada",
       description: "Los cambios han sido guardados exitosamente. Los nuevos cálculos usarán estos valores.",
@@ -97,6 +60,10 @@ export default function SettingsPage() {
 
   const parseCurrencyFromInput = (value: string): number => {
       return parseInt(value.replace(/\./g, ''), 10) || 0;
+  }
+  
+  if (isLoading) {
+    return <div>Cargando configuración...</div>
   }
 
   return (
@@ -248,3 +215,5 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+    

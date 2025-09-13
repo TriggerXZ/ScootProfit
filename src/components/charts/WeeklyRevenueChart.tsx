@@ -9,20 +9,24 @@ import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { calculateDailyTotal } from '@/lib/calculations';
 import { formatCurrencyCOP } from '@/lib/formatters';
+import { useSettings } from '@/hooks/useSettings';
 
 interface WeeklyRevenueChartProps {
   entries: RevenueEntry[];
 }
 
 export function WeeklyRevenueChart({ entries }: WeeklyRevenueChartProps) {
+  const { settings, isLoading: isLoadingSettings } = useSettings();
+
   const chartData = React.useMemo(() => {
+    if (isLoadingSettings) return [];
     const data = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
       const date = subDays(today, i);
       const dateString = format(date, 'yyyy-MM-dd');
       const dayEntry = entries.find(e => e.date === dateString);
-      const total = dayEntry ? calculateDailyTotal(dayEntry).total : 0;
+      const total = dayEntry ? calculateDailyTotal(dayEntry, settings).total : 0;
       data.push({
         name: format(date, 'EEE', { locale: es }), // e.g., 'lun', 'mar'
         date: format(date, 'd MMM', { locale: es }),
@@ -30,7 +34,7 @@ export function WeeklyRevenueChart({ entries }: WeeklyRevenueChartProps) {
       });
     }
     return data;
-  }, [entries]);
+  }, [entries, settings, isLoadingSettings]);
   
   const chartConfig = {
     total: {
@@ -82,3 +86,5 @@ export function WeeklyRevenueChart({ entries }: WeeklyRevenueChartProps) {
     </ChartContainer>
   );
 }
+
+    

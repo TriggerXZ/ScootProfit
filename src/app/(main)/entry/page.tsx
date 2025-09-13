@@ -16,9 +16,12 @@ import { es } from 'date-fns/locale';
 import { exportRevenuesToCSV } from '@/lib/csvExport';
 import { calculateDailyTotal } from '@/lib/calculations';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
+import { useSettings } from '@/hooks/useSettings';
+
 
 export default function RevenueEntryPage() {
   const { entries, addEntry, getEntryByDate, deleteEntry, refreshEntries } = useRevenueEntries();
+  const { settings } = useSettings();
   const [editingEntry, setEditingEntry] = useState<RevenueEntry | null>(null);
   
   const currentMonth = new Date().getMonth();
@@ -70,7 +73,7 @@ export default function RevenueEntryPage() {
 
   const handleExportCSV = () => {
     const dataToExport = filteredEntries.map(entry => {
-        const dailyTotal = calculateDailyTotal(entry);
+        const dailyTotal = calculateDailyTotal(entry, settings);
         return {
             date: formatDate(entry.date, 'yyyy-MM-dd'),
             la72: entry.revenues.la72,
@@ -202,3 +205,5 @@ export default function RevenueEntryPage() {
     </div>
   );
 }
+
+    

@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrencyCOP } from '@/lib/formatters';
-import { LOCAL_STORAGE_SETTINGS_KEY, DEFAULT_MONTHLY_GOAL } from '@/lib/constants';
+import { useSettings } from '@/hooks/useSettings';
 import type { AggregatedTotal } from '@/types';
 import { Target } from 'lucide-react';
 
@@ -14,43 +14,10 @@ interface GoalProgressCardProps {
   currentPeriod: AggregatedTotal | null;
 }
 
-function getSettings() {
-    if (typeof window === 'undefined') {
-        return { monthlyGoal: DEFAULT_MONTHLY_GOAL };
-    }
-    const storedSettings = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
-    if (storedSettings) {
-        try {
-            const parsed = JSON.parse(storedSettings);
-            return {
-                monthlyGoal: parsed.monthlyGoal || DEFAULT_MONTHLY_GOAL
-            };
-        } catch (e) {
-            return { monthlyGoal: DEFAULT_MONTHLY_GOAL };
-        }
-    }
-    return { monthlyGoal: DEFAULT_MONTHLY_GOAL };
-}
-
-
 export function GoalProgressCard({ currentPeriod }: GoalProgressCardProps) {
-  const [settings, setSettings] = useState({ monthlyGoal: DEFAULT_MONTHLY_GOAL });
+  const { settings, isLoading: isLoadingSettings } = useSettings();
 
-  useEffect(() => {
-    setSettings(getSettings());
-    
-    const handleStorageChange = () => {
-        setSettings(getSettings());
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-        window.removeEventListener('storage', handleStorageChange);
-    };
-
-  }, []);
-
-  if (!currentPeriod) {
+  if (!currentPeriod || isLoadingSettings) {
     return (
       <Card className="shadow-lg">
         <CardHeader>
@@ -95,3 +62,5 @@ export function GoalProgressCard({ currentPeriod }: GoalProgressCardProps) {
     </Card>
   );
 }
+
+    

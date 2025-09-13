@@ -17,10 +17,12 @@ import {
 } from '@/lib/calculations';
 import { LOCATION_IDS, LocationId } from '@/lib/constants';
 import { format } from 'date-fns';
+import { useSettings } from './useSettings';
 
 export function useRevenueEntries() {
   const [entries, setEntries] = useState<RevenueEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { settings, isLoading: isSettingsLoading } = useSettings();
 
   const refreshEntries = useCallback(() => {
     setIsLoading(true);
@@ -59,27 +61,31 @@ export function useRevenueEntries() {
   }, []);
   
   const getDailySummary = useCallback((date: Date): ReturnType<typeof calculateDailyTotal> | null => {
+    if (isSettingsLoading) return null;
     const dateString = format(date, 'yyyy-MM-dd');
     const entryForDay = entries.find(e => e.date === dateString);
     if (!entryForDay) return null;
-    return calculateDailyTotal(entryForDay);
-  }, [entries]);
+    return calculateDailyTotal(entryForDay, settings);
+  }, [entries, settings, isSettingsLoading]);
 
   const allWeeklyTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
-    return getWeeklyTotals(entries, expenses);
-  }, [entries]);
+    if (isSettingsLoading) return [];
+    return getWeeklyTotals(entries, expenses, settings);
+  }, [entries, settings, isSettingsLoading]);
 
   const all28DayTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
-    return get28DayTotals(entries, expenses);
-  }, [entries]);
+     if (isSettingsLoading) return [];
+    return get28DayTotals(entries, expenses, settings);
+  }, [entries, settings, isSettingsLoading]);
 
   const allCalendarMonthlyTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
-    return getCalendarMonthlyTotals(entries, expenses);
-  }, [entries]);
+     if (isSettingsLoading) return [];
+    return getCalendarMonthlyTotals(entries, expenses, settings);
+  }, [entries, settings, isSettingsLoading]);
 
   return {
     entries,
-    isLoading,
+    isLoading: isLoading || isSettingsLoading,
     addEntry,
     deleteEntry,
     getEntryByDate,
@@ -90,3 +96,5 @@ export function useRevenueEntries() {
     refreshEntries,
   };
 }
+
+    
