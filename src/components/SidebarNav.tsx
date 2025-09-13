@@ -1,8 +1,9 @@
+
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Edit3, BarChart3, Settings, ReceiptText } from 'lucide-react';
+import { Home, Edit3, BarChart3, Settings, ReceiptText, LineChart } from 'lucide-react';
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +12,7 @@ const navItems = [
   { href: '/entry', label: 'Registrar Ingresos', icon: Edit3 },
   { href: '/expenses', label: 'Registrar Gastos', icon: ReceiptText },
   { href: '/reports', label: 'Reportes', icon: BarChart3 },
+  { href: '/profitability', label: 'Rentabilidad', icon: LineChart },
 ];
 
 export function SidebarNav() {

@@ -115,11 +115,11 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                       <span className="text-left">{item.period}</span>
                     </span>
                     <div className="text-right">
-                      <div className={`text-xl font-semibold flex items-center justify-end ${isGoalMet ? 'text-green-500' : 'text-red-500'}`}>
-                         {isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
-                        {formatCurrencyCOP(item.totalRevenueInPeriod)}
+                      <div className={`text-xl font-semibold flex items-center justify-end ${item.finalNetProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                         {item.finalNetProfit >= 0 ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
+                        {formatCurrencyCOP(item.finalNetProfit)}
                       </div>
-                      <div className="text-xs text-muted-foreground">Ingresos Totales del Periodo</div>
+                      <div className="text-xs text-muted-foreground">Beneficio Neto del Periodo</div>
                     </div>
                   </div>
                 </AccordionTrigger>
@@ -164,58 +164,37 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         <div className="space-y-3">
                             <div className="flex justify-between items-center">
                                 <span className="font-medium text-foreground">Total Ingresos Brutos del Periodo:</span>
-                                <span className="font-semibold text-foreground">{formatCurrencyCOP(item.totalRevenueInPeriod)}</span>
+                                <span className="font-semibold text-green-500">{formatCurrencyCOP(item.totalRevenueInPeriod)}</span>
                             </div>
                             <div className="flex justify-between items-center">
-                                <span className="font-medium text-foreground">Cuota Bruta Estimada por Miembro:</span>
-                                <span className="text-muted-foreground">{formatCurrencyCOP(item.grossMemberShare)}</span>
+                                <span className="font-medium text-foreground">Total Costos Fijos:</span>
+                                <span className="text-muted-foreground">({formatCurrencyCOP(item.deductionsDetail.totalDeductions)})</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="font-medium text-foreground">Total Gastos Variables:</span>
+                                <span className="text-muted-foreground">({formatCurrencyCOP(item.totalVariableExpenses)})</span>
                             </div>
                         </div>
 
                         {/* Right Column: Net Figures */}
                          <div className="space-y-3 p-3 rounded-md bg-card border">
                               <div className="flex justify-between items-center">
-                                  <span className="font-medium text-foreground">Ingreso Neto (después de costos fijos):</span>
-                                  <span className={`font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-green-600'}`}>
+                                  <span className="font-medium text-foreground">Ingreso (después de costos fijos):</span>
+                                  <span className={`font-semibold ${item.netRevenueToDistribute < 0 ? 'text-destructive' : 'text-foreground'}`}>
                                     {formatCurrencyCOP(item.netRevenueToDistribute)}
                                     {item.netRevenueToDistribute < 0 && <AlertCircle className="inline ml-1 h-4 w-4" />}
                                   </span>
                               </div>
                               <div className="flex justify-between items-center font-bold text-lg">
-                                  <span className="text-primary">Rentabilidad Neta Final del Periodo:</span>
-                                  <span className={`text-primary ${item.netRevenueToDistribute < 0 ? 'text-destructive' : ''}`}>
-                                    {formatCurrencyCOP(item.netRevenueToDistribute)}
+                                  <span className="text-primary">Beneficio Neto Final del Periodo:</span>
+                                  <span className={`text-primary ${item.finalNetProfit < 0 ? 'text-destructive' : ''}`}>
+                                    {formatCurrencyCOP(item.finalNetProfit)}
                                   </span>
                               </div>
                            </div>
                      </div>
                   </div>
-
-                  {/* Deductions & Expenses Details */}
-                  <div className="pt-4 border-t grid md:grid-cols-2 gap-8">
-                        <div>
-                           <h4 className="text-md font-semibold text-foreground flex items-center gap-2 mb-3">
-                              <TrendingDown className="h-5 w-5 text-destructive" />
-                              Costos Operativos Fijos
-                           </h4>
-                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                              <div className="p-3 bg-card rounded-md">
-                                <p className="text-sm text-muted-foreground">Zona Segura</p>
-                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.zonaSegura)}</p>
-                              </div>
-                               <div className="p-3 bg-card rounded-md">
-                                <p className="text-sm text-muted-foreground">Arriendo</p>
-                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.arriendo)}</p>
-                              </div>
-                               <div className="p-3 bg-card rounded-md">
-                                <p className="text-sm text-muted-foreground">Aporte Cooperativa</p>
-                                <p className="font-semibold text-destructive">{formatCurrencyCOP(item.deductionsDetail.aporteCooperativa)}</p>
-                              </div>
-                           </div>
-                        </div>
-                  </div>
-
-
+                  
                   {/* Final Net Share */}
                   <div className="pt-6 border-t mt-4 text-center">
                       <h4 className="text-lg font-headline text-foreground">Cuota Neta Final por Miembro</h4>
@@ -223,7 +202,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                           {formatCurrencyCOP(item.netMemberShare)}
                           {item.netMemberShare < 0 && <AlertCircle className="inline ml-2 h-6 w-6" />}
                       </div>
-                       <p className="text-xs text-muted-foreground mt-1">Este es el monto final a liquidar por miembro después de costos fijos.</p>
+                       <p className="text-xs text-muted-foreground mt-1">Este es el monto final a liquidar por miembro después de todos los costos.</p>
                   </div>
 
 

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import type { RevenueEntry, AggregatedTotal, LocationRevenueInput } from '@/types';
+import type { RevenueEntry, AggregatedTotal, LocationRevenueInput, Expense } from '@/types';
 import { 
   getRevenueEntries as fetchEntries, 
   addOrUpdateRevenueEntry as saveEntry,
@@ -65,16 +65,16 @@ export function useRevenueEntries() {
     return calculateDailyTotal(entryForDay);
   }, [entries]);
 
-  const allWeeklyTotals = useCallback((): AggregatedTotal[] => {
-    return getWeeklyTotals(entries);
+  const allWeeklyTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
+    return getWeeklyTotals(entries, expenses);
   }, [entries]);
 
-  const all28DayTotals = useCallback((): AggregatedTotal[] => {
-    return get28DayTotals(entries);
+  const all28DayTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
+    return get28DayTotals(entries, expenses);
   }, [entries]);
 
-  const allCalendarMonthlyTotals = useCallback((): AggregatedTotal[] => {
-    return getCalendarMonthlyTotals(entries);
+  const allCalendarMonthlyTotals = useCallback((expenses: Expense[] = []): AggregatedTotal[] => {
+    return getCalendarMonthlyTotals(entries, expenses);
   }, [entries]);
 
   return {

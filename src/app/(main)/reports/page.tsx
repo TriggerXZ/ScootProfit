@@ -7,6 +7,7 @@ import { AggregatedSummarySection } from '@/components/sections/AggregatedSummar
 import { GroupPerformanceChart } from '@/components/charts/GroupPerformanceChart';
 import { LocationPerformanceChart } from '@/components/charts/LocationPerformanceChart';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
+import { useExpenses } from '@/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
@@ -29,7 +30,8 @@ type TranslatedAnalysis = {
 };
 
 export default function ReportsPage() {
-  const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, entries, isLoading } = useRevenueEntries();
+  const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, entries, isLoading: isLoadingRevenues } = useRevenueEntries();
+  const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const [activeTab, setActiveTab] = useState('weekly');
   
   const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
@@ -78,17 +80,7 @@ export default function ReportsPage() {
     const groupMap: { [key: string]: number } = {};
     const locationMap: { [key: string]: number } = {};
 
-    const sourceEntries = filteredEntries.length > 0 ? filteredEntries : entries;
-
-    sourceEntries.forEach(entry => {
-        // Correctly calculate group totals based on rotation for each entry's date
-        const entryDate = parseISO(entry.date);
-        for (const [locationId, revenue] of Object.entries(entry.revenues)) {
-             // Calculate group totals from useRevenueEntries hook for consistency
-        }
-    });
-
-    const totalsFromHook = allCalendarMonthlyTotals(); // You might want to use a more specific hook if available
+    const totalsFromHook = allCalendarMonthlyTotals(expenses);
     const relevantTotals = totalsFromHook.find(t => {
         if(t.entries.length === 0) return false;
         const entryDate = parseISO(t.entries[0].date);
@@ -97,7 +89,6 @@ export default function ReportsPage() {
 
     if (relevantTotals) {
         Object.assign(groupMap, relevantTotals.groupRevenueTotals);
-        // Calculate location totals for the selected period
         relevantTotals.entries.forEach(entry => {
             for (const [location, revenue] of Object.entries(entry.revenues)) {
                 locationMap[location] = (locationMap[location] || 0) + revenue;
@@ -106,7 +97,9 @@ export default function ReportsPage() {
     }
 
     return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [filteredEntries, entries, allCalendarMonthlyTotals, selectedMonth, selectedYear]);
+  }, [expenses, allCalendarMonthlyTotals, selectedMonth, selectedYear]);
+  
+  const isLoading = isLoadingRevenues || isLoadingExpenses;
 
   const handleAnalyzeClick = async () => {
     setIsAnalysisLoading(true);
@@ -242,18 +235,25 @@ export default function ReportsPage() {
               <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; color: ${textColor};">4. Ingreso Neto del Período para Distribución (1 - 3):</td>
               <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: ${item.netRevenueToDistribute < 0 ? '#dc3545' : textColor};">${formatCurrencyCOP(item.netRevenueToDistribute)}</td>
             </tr>
+             <tr>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">5. Total Gastos Variables del Período:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">(${formatCurrencyCOP(item.totalVariableExpenses)})</td>
+            </tr>
             <tr style="background-color: #f9f9f9;">
-              <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">5. Número de Miembros Participantes:</td>
-              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${item.numberOfMembers}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; font-weight: bold; color: ${textColor};">6. Beneficio Neto Final del Período (4 - 5):</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: ${item.finalNetProfit < 0 ? '#dc3545' : textColor};">${formatCurrencyCOP(item.finalNetProfit)}</td>
             </tr>
             <tr>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">6. Monto Neto a Pagar al Miembro (4 / 5):</td>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netRevenueToDistribute >= 0 && item.netMemberShare > 0 ? '#28a745' : '#dc3545'};">${formatCurrencyCOP(item.netMemberShare)}</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; color: ${textColor};">7. Número de Miembros Participantes:</td>
+              <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right; color: ${textColor};">${item.numberOfMembers}</td>
+            </tr>
+            <tr style="background-color: #f0f0f0;">
+              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 12pt; color: ${textColor};">8. Monto Neto a Pagar al Miembro (6 / 7):</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 12pt; color: ${item.netMemberShare < 0 ? '#dc3545' : '#28a745'};">${formatCurrencyCOP(item.netMemberShare)}</td>
             </tr>
           </tbody>
         </table>
-        ${item.netRevenueToDistribute < 0 ? `<p style="color: red; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: El ingreso neto a distribuir es negativo, lo que indica que los costos operativos superaron los ingresos del período.</p>` : ''}
-        ${item.netRevenueToDistribute >= 0 && item.netMemberShare <= 0 && item.totalRevenueInPeriod > item.deductionsDetail.totalDeductions ? `<p style="color: orange; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: Aunque hubo un ingreso neto positivo para distribuir, la cuota individual por miembro es cero o negativa debido al redondeo o un alto número de miembros.</p>` : ''}
+        ${item.finalNetProfit < 0 ? `<p style="color: red; text-align: center; margin-top: 15px; font-size: 9pt;">Nota: El beneficio neto del período es negativo, lo que indica que los costos y gastos totales superaron los ingresos.</p>` : ''}
         <p style="text-align: center; margin-top: 25px; font-size: 9pt; color: #777;">Este es un documento generado automáticamente.</p>
       </div>
     `;
@@ -343,7 +343,7 @@ export default function ReportsPage() {
           <TabsContent value="weekly">
               <AggregatedSummarySection 
                 title="Ingresos Semanales" 
-                totals={allWeeklyTotals()} 
+                totals={allWeeklyTotals(expenses)} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
@@ -351,7 +351,7 @@ export default function ReportsPage() {
           <TabsContent value="28-days">
               <AggregatedSummarySection 
                 title="Ingresos por Períodos de 28 días" 
-                totals={all28DayTotals()} 
+                totals={all28DayTotals(expenses)} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />
@@ -359,7 +359,7 @@ export default function ReportsPage() {
           <TabsContent value="monthly">
               <AggregatedSummarySection 
                 title="Ingresos Mensuales" 
-                totals={allCalendarMonthlyTotals()} 
+                totals={allCalendarMonthlyTotals(expenses)} 
                 isLoading={isLoading}
                 onDownloadInvoice={handleDownloadInvoicePDF}
               />

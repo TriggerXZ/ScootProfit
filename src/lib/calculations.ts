@@ -1,5 +1,5 @@
 
-import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue } from '@/types';
+import type { RevenueEntry, DailyTotal, AggregatedTotal, LocationRevenue, DeductionsDetail, GroupId, GroupRevenue, Expense } from '@/types';
 import { 
   LOCAL_STORAGE_SETTINGS_KEY,
   LOCATION_IDS, 
@@ -18,6 +18,7 @@ import {
   format,
   add,
   differenceInCalendarDays,
+  isWithinInterval,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -98,7 +99,9 @@ export function calculateLocationTotalsForPeriod(entries: RevenueEntry[]): Locat
 const calculateAggregatedTotals = (
   periodEntries: RevenueEntry[], 
   periodLabel: string,
-  applyDeductionsForThisPeriod: boolean
+  applyDeductionsForThisPeriod: boolean,
+  periodExpenses: Expense[],
+  periodInterval: Interval
 ): AggregatedTotal => {
   const { 
     numberOfMembers, 
@@ -137,7 +140,12 @@ const calculateAggregatedTotals = (
   }
 
   const netRevenueToDistribute = totalRevenueInPeriod - deductionsDetail.totalDeductions;
-  const netMemberShare = numberOfMembers > 0 ? netRevenueToDistribute / numberOfMembers : 0;
+  
+  const relevantExpenses = periodExpenses.filter(expense => isWithinInterval(parseISO(expense.date), periodInterval));
+  const totalVariableExpenses = relevantExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+  const finalNetProfit = netRevenueToDistribute - totalVariableExpenses;
+  const netMemberShare = numberOfMembers > 0 ? finalNetProfit / numberOfMembers : 0;
 
   return {
     period: periodLabel,
@@ -145,6 +153,8 @@ const calculateAggregatedTotals = (
     grossMemberShare,
     deductionsDetail,
     netRevenueToDistribute,
+    totalVariableExpenses,
+    finalNetProfit,
     netMemberShare,
     groupRevenueTotals,
     entries: periodEntries,
@@ -154,7 +164,8 @@ const calculateAggregatedTotals = (
 
 const getPeriodData = (
   allEntries: RevenueEntry[], 
-  getPeriodKey: (date: Date) => string,
+  allExpenses: Expense[],
+  getPeriodKeyAndInterval: (date: Date) => { key: string, interval: Interval },
   getPeriodLabel: (date: Date) => string,
   applyDeductionsLogic: (date: Date, entries: RevenueEntry[]) => boolean
 ): AggregatedTotal[] => {
@@ -164,27 +175,35 @@ const getPeriodData = (
 
   allEntries.forEach(entry => {
     const entryDate = parseISO(entry.date);
-    const periodKey = getPeriodKey(entryDate);
-    if (!periodAggregations[periodKey]) {
-      periodAggregations[periodKey] = [];
+    const { key } = getPeriodKeyAndInterval(entryDate);
+    if (!periodAggregations[key]) {
+      periodAggregations[key] = [];
     }
-    periodAggregations[periodKey].push(entry);
+    periodAggregations[key].push(entry);
   });
   
   return Object.keys(periodAggregations).map(periodKey => {
     const periodEntries = periodAggregations[periodKey];
     const periodStartDateObj = parseISO(periodKey);
+    const { interval } = getPeriodKeyAndInterval(periodStartDateObj);
     const periodLabel = getPeriodLabel(periodStartDateObj);
     const applyDeductions = applyDeductionsLogic(periodStartDateObj, periodEntries);
     
-    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductions);
+    return calculateAggregatedTotals(periodEntries, periodLabel, applyDeductions, allExpenses, interval);
   }).sort((a,b) => parseISO(b.entries[0].date).getTime() - parseISO(a.entries[0].date).getTime());
 };
 
-export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+export function getWeeklyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
   const rotationStartDate = startOfWeek(parseISO(ROTATION_START_DATE), { weekStartsOn: 2 });
   
-  const getPeriodKey = (date: Date) => format(startOfWeek(date, { weekStartsOn: 2 }), 'yyyy-MM-dd');
+  const getPeriodKeyAndInterval = (date: Date) => {
+    const start = startOfWeek(date, { weekStartsOn: 2 });
+    return {
+        key: format(start, 'yyyy-MM-dd'),
+        interval: { start, end: add(start, { days: 6 }) }
+    };
+  };
+
   const getPeriodLabel = (date: Date) => `Semana del ${format(date, 'PPP', { locale: es })}`;
   
   const applyDeductionsLogic = (periodStartDate: Date): boolean => {
@@ -193,17 +212,20 @@ export function getWeeklyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     return (weekIndex + 1) % 4 === 0;
   };
   
-  return getPeriodData(entries, getPeriodKey, getPeriodLabel, applyDeductionsLogic);
+  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, applyDeductionsLogic);
 }
 
-export function get28DayTotals(entries: RevenueEntry[]): AggregatedTotal[] {
+export function get28DayTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
   const rotationStartDate = startOfWeek(parseISO(ROTATION_START_DATE), { weekStartsOn: 2 });
 
-  const getPeriodKey = (date: Date) => {
+  const getPeriodKeyAndInterval = (date: Date) => {
     const diffInDays = differenceInCalendarDays(date, rotationStartDate);
     const periodIndex = Math.floor(diffInDays / 28);
-    const periodStartDate = add(rotationStartDate, { days: periodIndex * 28 });
-    return format(periodStartDate, 'yyyy-MM-dd');
+    const start = add(rotationStartDate, { days: periodIndex * 28 });
+    return {
+        key: format(start, 'yyyy-MM-dd'),
+        interval: { start, end: add(start, { days: 27 }) }
+    };
   };
 
   const getPeriodLabel = (date: Date) => {
@@ -211,18 +233,25 @@ export function get28DayTotals(entries: RevenueEntry[]): AggregatedTotal[] {
     return `Periodo del ${format(date, 'd MMM', { locale: es })} al ${format(endDate, 'd MMM yyyy', { locale: es })}`;
   };
   
-  return getPeriodData(entries, getPeriodKey, getPeriodLabel, () => true);
+  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, () => true);
 }
 
-export function getCalendarMonthlyTotals(entries: RevenueEntry[]): AggregatedTotal[] {
-  const getPeriodKey = (date: Date) => format(startOfMonth(date), 'yyyy-MM-dd');
+export function getCalendarMonthlyTotals(entries: RevenueEntry[], expenses: Expense[]): AggregatedTotal[] {
+  const getPeriodKeyAndInterval = (date: Date) => {
+    const start = startOfMonth(date);
+    return {
+        key: format(start, 'yyyy-MM-dd'),
+        interval: { start, end: add(start, { months: 1, days: -1 }) }
+    };
+  };
+
   const getPeriodLabel = (date: Date) => `Mes de ${format(date, 'MMMM yyyy', { locale: es })}`;
   
-  return getPeriodData(entries, getPeriodKey, getPeriodLabel, () => true);
+  return getPeriodData(entries, expenses, getPeriodKeyAndInterval, getPeriodLabel, () => true);
 }
 
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[]): string {
-  const monthlyTotals = get28DayTotals(entries); 
+  const monthlyTotals = get28DayTotals(entries, []); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries[0].date) : new Date(0);
