@@ -16,9 +16,9 @@ import { useSettings } from '@/hooks/useSettings';
 import type { AppSettings } from '@/hooks/useSettings';
 
 const settingsSchema = z.object({
-  numberOfMembers: z.number().int().positive("El número debe ser un entero positivo."),
-  monthlyGoal: z.number().int().positive("La meta debe ser un número positivo."),
-  weeklyGoal: z.number().int().positive("La meta debe ser un número positivo."),
+  numberOfMembers: z.number().int().min(1, "El número de miembros debe ser al menos 1."),
+  monthlyGoal: z.number().int().min(1, "La meta debe ser un número positivo."),
+  weeklyGoal: z.number().int().min(1, "La meta debe ser un número positivo."),
   zonaSeguraDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
   arriendoDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
   cooperativaDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
@@ -121,6 +121,9 @@ export default function SettingsPage() {
                   )}
                 />
                 {errors.weeklyGoal && <p className="text-sm text-destructive">{errors.weeklyGoal.message}</p>}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Esta meta se usa para calcular el cumplimiento diario en el Dashboard.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -141,6 +144,9 @@ export default function SettingsPage() {
                   )}
                 />
                 {errors.monthlyGoal && <p className="text-sm text-destructive">{errors.monthlyGoal.message}</p>}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Esta meta se usa en la tarjeta de progreso del Dashboard y en los reportes.
+                </p>
               </div>
             </div>
             
@@ -215,5 +221,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-    
