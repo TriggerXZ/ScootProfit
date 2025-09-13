@@ -169,12 +169,14 @@ export default function DashboardPage() {
           icon={TrendingUp}
           description={currentMonthData?.period ?? "Últimos 28 días"}
           percentageChange={percentageChange}
+          comparisonValue={previousMonthData?.totalRevenueInPeriod}
         />
         <StatCard 
           title="Gastos Período Actual" 
           value={formatCurrencyCOP(currentMonthData?.totalVariableExpenses ?? 0)}
           icon={TrendingDown}
           description="Gastos variables registrados"
+          comparisonValue={previousMonthData?.totalVariableExpenses}
         />
          <StatCard 
           title="Beneficio Neto Período" 
@@ -182,6 +184,7 @@ export default function DashboardPage() {
           icon={Scale}
           description="Ingresos menos costos y gastos"
           valueClassName={currentMonthData && currentMonthData.finalNetProfit < 0 ? 'text-destructive' : 'text-primary'}
+          comparisonValue={previousMonthData?.finalNetProfit}
         />
         <StatCard 
           title="Cuota Neta Miembro" 
@@ -189,6 +192,7 @@ export default function DashboardPage() {
           icon={Users}
           description="Beneficio final por miembro"
           valueClassName={currentMonthData && currentMonthData.netMemberShare < 0 ? 'text-destructive' : ''}
+          comparisonValue={previousMonthData?.netMemberShare}
         />
       </div>
       
@@ -318,5 +322,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
