@@ -27,7 +27,7 @@ import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/pre
 import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { translateText } from '@/ai/flows/translate-text-flow';
 import { useSettings } from '@/hooks/useSettings';
-import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users, PieChart } from 'lucide-react';
+import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users, PieChart, CheckCircle, AlertTriangle, Target } from 'lucide-react';
 import { TopPerformerCard } from '@/components/cards/TopPerformerCard';
 import { GROUPS, LOCATIONS } from '@/lib/constants';
 import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
@@ -76,8 +76,6 @@ export default function DashboardPage() {
   const currentPeriodExpenses: Expense[] = useMemo(() => {
     if (!currentMonthData || expenses.length === 0) return [];
     
-    // We need to parse the period string to get start and end dates.
-    // Assuming the period format is "Periodo del D MMM al D MMM YYYY"
     const periodStartDate = currentMonthData.entries.length > 0 ? parseISO(currentMonthData.entries[currentMonthData.entries.length - 1].date) : new Date();
     const periodEndDate = currentMonthData.entries.length > 0 ? parseISO(currentMonthData.entries[0].date) : new Date();
 
@@ -94,7 +92,6 @@ export default function DashboardPage() {
 
     const { groupRevenueTotals, entries: periodEntries } = currentMonthData;
 
-    // Find top group
     let topGroup = { name: 'N/A', total: 0 };
     if (groupRevenueTotals && Object.keys(groupRevenueTotals).length > 0) {
       const topGroupId = Object.entries(groupRevenueTotals).reduce((a, b) => a[1] > b[1] ? a : b)[0];
@@ -104,7 +101,6 @@ export default function DashboardPage() {
       };
     }
 
-    // Find top location
     let topLocation = { name: 'N/A', total: 0 };
     if (periodEntries && periodEntries.length > 0) {
       const locationTotals: { [key: string]: number } = {};
@@ -123,13 +119,18 @@ export default function DashboardPage() {
     return { topGroup, topLocation };
   }, [currentMonthData]);
 
-  const dailyExpensesTotal = useMemo(() => {
-      if (!selectedDate) return 0;
-      const dateString = format(selectedDate, 'yyyy-MM-dd');
-      return expenses
-          .filter(e => e.date === dateString)
-          .reduce((sum, e) => sum + e.amount, 0);
-  }, [selectedDate, expenses]);
+  const dailyFinancials = useMemo(() => {
+    if (!selectedDate) return { dailyRevenue: 0, dailyExpenses: 0, dailyNet: 0, dailyGoal: 0 };
+    const dateString = format(selectedDate, 'yyyy-MM-dd');
+    const dailyRevenue = dailySummary?.total ?? 0;
+    const dailyExpenses = expenses
+        .filter(e => e.date === dateString)
+        .reduce((sum, e) => sum + e.amount, 0);
+    const dailyNet = dailyRevenue - dailyExpenses;
+    const dailyGoal = settings.weeklyGoal > 0 ? settings.weeklyGoal / 7 : 0;
+    return { dailyRevenue, dailyExpenses, dailyNet, dailyGoal };
+  }, [selectedDate, expenses, dailySummary, settings.weeklyGoal]);
+
 
   const handlePredictClick = async () => {
     setIsPredictionLoading(true);
@@ -279,22 +280,37 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {dailySummary || dailyExpensesTotal > 0 ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
+              {dailyFinancials.dailyRevenue > 0 || dailyFinancials.dailyExpenses > 0 ? (
+                  <div className="space-y-3">
+                     <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                            <TrendingUp className="h-5 w-5 text-green-600" />
-                            <span className="font-medium text-green-700">Ingresos Totales del Día</span>
+                            <TrendingUp className="h-5 w-5 text-green-500" />
+                            <span className="font-medium text-foreground">Ingresos del Día</span>
                         </div>
-                        <span className="font-semibold text-lg text-green-600">{formatCurrencyCOP(dailySummary?.total ?? 0)}</span>
+                        <span className="font-semibold text-lg text-green-500">{formatCurrencyCOP(dailyFinancials.dailyRevenue)}</span>
                     </div>
-                    <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
+                    <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3">
-                            <TrendingDown className="h-5 w-5 text-red-600" />
-                            <span className="font-medium text-red-700">Gastos Totales del Día</span>
+                            <TrendingDown className="h-5 w-5 text-red-500" />
+                            <span className="font-medium text-foreground">Gastos del Día</span>
                         </div>
-                        <span className="font-semibold text-lg text-red-600">{formatCurrencyCOP(dailyExpensesTotal)}</span>
+                        <span className="font-semibold text-lg text-red-500">{formatCurrencyCOP(dailyFinancials.dailyExpenses)}</span>
                     </div>
+                    <div className={`flex items-center justify-between p-3 rounded-lg border-2 ${dailyFinancials.dailyNet >= 0 ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                        <div className="flex items-center gap-3">
+                             <Scale className={`h-5 w-5 ${dailyFinancials.dailyNet >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+                            <span className={`font-bold ${dailyFinancials.dailyNet >= 0 ? 'text-green-700' : 'text-red-700'}`}>Beneficio Neto del Día</span>
+                        </div>
+                        <span className={`font-bold text-xl ${dailyFinancials.dailyNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrencyCOP(dailyFinancials.dailyNet)}</span>
+                    </div>
+                    {dailyFinancials.dailyGoal > 0 && (
+                       <div className={`flex items-center justify-center gap-2 p-2 rounded-lg text-sm ${dailyFinancials.dailyRevenue >= dailyFinancials.dailyGoal ? 'bg-sky-500/10 text-sky-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                            {dailyFinancials.dailyRevenue >= dailyFinancials.dailyGoal ? <CheckCircle className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+                            <span>
+                                {dailyFinancials.dailyRevenue >= dailyFinancials.dailyGoal ? 'Meta diaria cumplida' : `Meta diaria: ${formatCurrencyCOP(dailyFinancials.dailyGoal)}`}
+                            </span>
+                        </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -384,5 +400,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
