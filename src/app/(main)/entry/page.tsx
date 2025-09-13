@@ -70,6 +70,16 @@ export default function RevenueEntryPage() {
     }
     return years;
   }, [entries, currentYear]);
+  
+  const averageDailyRevenueLast7Days = useMemo(() => {
+    if (entries.length < 7) return 0;
+    // Get the 7 most recent entries (assuming entries are sorted by date desc)
+    const recentEntries = entries.slice(0, 7);
+    const total = recentEntries.reduce((sum, entry) => {
+      return sum + calculateDailyTotal(entry, settings).total;
+    }, 0);
+    return total / recentEntries.length;
+  }, [entries, settings]);
 
   const handleExportCSV = () => {
     const dataToExport = filteredEntries.map(entry => {
@@ -150,6 +160,7 @@ export default function RevenueEntryPage() {
         getExistingEntry={getEntryByDate}
         editingEntry={editingEntry}
         onCancelEdit={handleCancelEdit}
+        averageDailyRevenue={averageDailyRevenueLast7Days}
       />
       
       <Separator />

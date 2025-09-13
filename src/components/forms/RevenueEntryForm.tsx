@@ -15,7 +15,7 @@ import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Coins, Sigma } from 'lucide-react';
+import { Coins, Sigma, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { formatCurrencyCOP } from '@/lib/formatters';
 
 const revenueSchema = z.string().refine(val => !isNaN(parseFloat(val.replace(/\./g, ''))) && parseFloat(val.replace(/\./g, '')) >= 0, {
@@ -37,6 +37,7 @@ interface RevenueEntryFormProps {
   getExistingEntry: (date: string) => RevenueEntry | undefined;
   editingEntry: RevenueEntry | null;
   onCancelEdit: () => void;
+  averageDailyRevenue: number;
 }
 
 const formatInputValue = (value: string | number): string => {
@@ -50,7 +51,7 @@ const parseInputValue = (value: string): string => {
 };
 
 
-export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEntry, onCancelEdit }: RevenueEntryFormProps) {
+export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEntry, onCancelEdit, averageDailyRevenue }: RevenueEntryFormProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
@@ -74,6 +75,11 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
       return sum + (isNaN(parsedValue) ? 0 : parsedValue);
     }, 0);
   }, [watchedRevenues]);
+  
+  const isAboveAverage = useMemo(() => {
+    if (averageDailyRevenue === 0 || dailyTotal === 0) return null;
+    return dailyTotal > averageDailyRevenue;
+  }, [dailyTotal, averageDailyRevenue]);
 
   useEffect(() => {
     const today = new Date();
@@ -223,7 +229,15 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
                     <Sigma className="h-6 w-6 text-primary" />
                     <span className="font-semibold text-lg text-foreground">Total del Día</span>
                 </div>
-                <span className="font-bold text-2xl text-primary font-headline">{formatCurrencyCOP(dailyTotal)}</span>
+                 <div className="text-right">
+                    <span className="font-bold text-2xl text-primary font-headline">{formatCurrencyCOP(dailyTotal)}</span>
+                     {isAboveAverage !== null && (
+                         <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${isAboveAverage ? 'text-green-500' : 'text-red-500'}`}>
+                            {isAboveAverage ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                            <span>vs. promedio de 7 días ({formatCurrencyCOP(averageDailyRevenue)})</span>
+                        </div>
+                     )}
+                </div>
             </div>
           </div>
 
