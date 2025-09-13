@@ -9,6 +9,7 @@ import {
   deleteExpense as removeExpense
 } from '@/lib/localStorageStore';
 import { v4 as uuidv4 } from 'uuid';
+import { isWithinInterval, parseISO } from 'date-fns';
 
 export function useExpenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -41,6 +42,10 @@ export function useExpenses() {
     removeExpense(id);
     refreshExpenses();
   }, [refreshExpenses]);
+
+  const getExpensesForPeriod = useCallback((interval: Interval): Expense[] => {
+    return expenses.filter(expense => isWithinInterval(parseISO(expense.date), interval));
+  }, [expenses]);
   
 
   return {
@@ -49,5 +54,6 @@ export function useExpenses() {
     addExpense,
     deleteExpense,
     refreshExpenses,
+    getExpensesForPeriod,
   };
 }

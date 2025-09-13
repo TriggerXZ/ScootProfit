@@ -7,14 +7,15 @@ import { Button } from '@/components/ui/button';
 import { StatCard } from '@/components/cards/StatCard';
 import { GoalProgressCard } from '@/components/cards/GoalProgressCard';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
+import { useExpenses } from '@/hooks/useExpenses';
 import { formatCurrencyCOP, formatDate } from '@/lib/formatters';
-import { calculateDailyTotal, getHistoricalMonthlyDataString } from '@/lib/calculations';
+import { calculateDailyTotal } from '@/lib/calculations';
 import { LOCATIONS, LOCATION_IDS } from '@/lib/constants';
-import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit, Languages } from 'lucide-react';
+import { Calendar, DollarSign, Users, Edit3, TrendingUp, MapPin, BrainCircuit, Languages, TrendingDown, Scale } from 'lucide-react';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 import {
   AlertDialog,
@@ -27,10 +28,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { predictMonthlyIncome, PredictMonthlyIncomeOutput } from '@/ai/flows/predict-income-flow';
+import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 import { translateText } from '@/ai/flows/translate-text-flow';
+import type { AggregatedTotal } from '@/types';
 
 export default function DashboardPage() {
-  const { entries, isLoading, getDailySummary, all28DayTotals, refreshEntries } = useRevenueEntries();
+  const { entries, isLoading: isLoadingRevenues, all28DayTotals, getDailySummary, refreshEntries } = useRevenueEntries();
+  const { expenses, isLoading: isLoadingExpenses, getExpensesForPeriod } = useExpenses();
+  
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof calculateDailyTotal> | null>(null);
   const [isPredictionLoading, setIsPredictionLoading] = useState(false);
@@ -54,37 +59,24 @@ export default function DashboardPage() {
   useEffect(() => {
     refreshEntries(); 
   }, [refreshEntries]);
+  
+  const isLoading = isLoadingRevenues || isLoadingExpenses;
 
   const { currentMonthData, previousMonthData } = useMemo(() => {
     if (isLoading || entries.length === 0) return { currentMonthData: null, previousMonthData: null };
-    const totals = all28DayTotals();
+    const totals = all28DayTotals(expenses);
     const current = totals.length > 0 ? totals[0] : null;
     const previous = totals.length > 1 ? totals[1] : null;
     return { currentMonthData: current, previousMonthData: previous };
-  }, [all28DayTotals, isLoading, entries]);
+  }, [all28DayTotals, isLoading, entries, expenses]);
 
-
-  const averageDailyRevenue = useMemo(() => {
-    if (entries.length === 0) return 0;
-    const dailyTotalsMap = new Map<string, { sum: number, count: number }>();
-    entries.forEach(entry => {
-      const dateStr = entry.date;
-      const dailyTotalForEntry = calculateDailyTotal(entry).total;
-      const current = dailyTotalsMap.get(dateStr) || { sum: 0, count: 0 };
-      current.sum += dailyTotalForEntry;
-      current.count = 1; 
-      dailyTotalsMap.set(dateStr, current);
-    });
-
-    if (dailyTotalsMap.size === 0) return 0;
-    
-    let totalRevenue = 0;
-    dailyTotalsMap.forEach(value => {
-      totalRevenue += value.sum;
-    });
-    
-    return totalRevenue / dailyTotalsMap.size;
-  }, [entries]);
+  const dailyExpensesTotal = useMemo(() => {
+      if (!selectedDate) return 0;
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      return expenses
+          .filter(e => e.date === dateString)
+          .reduce((sum, e) => sum + e.amount, 0);
+  }, [selectedDate, expenses]);
 
   const percentageChange = useMemo(() => {
     if (currentMonthData && previousMonthData && typeof previousMonthData.totalRevenueInPeriod === 'number' && previousMonthData.totalRevenueInPeriod > 0) {
@@ -173,29 +165,31 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 
-          title="Total Período Actual (28 días)" 
+          title="Ingresos Período Actual" 
           value={formatCurrencyCOP(currentMonthData?.totalRevenueInPeriod ?? 0)}
-          icon={Calendar}
-          description={currentMonthData?.period ?? "Ingresos del último período"}
+          icon={TrendingUp}
+          description={currentMonthData?.period ?? "Últimos 28 días"}
           percentageChange={percentageChange}
         />
         <StatCard 
-          title="Promedio Diario (Hist.)" 
-          value={formatCurrencyCOP(averageDailyRevenue)}
-          icon={TrendingUp}
-          description="Promedio de todos los registros"
+          title="Gastos Período Actual" 
+          value={formatCurrencyCOP(currentMonthData?.totalVariableExpenses ?? 0)}
+          icon={TrendingDown}
+          description="Gastos variables registrados"
+        />
+         <StatCard 
+          title="Beneficio Neto Período" 
+          value={formatCurrencyCOP(currentMonthData?.finalNetProfit ?? 0)}
+          icon={Scale}
+          description="Ingresos menos costos y gastos"
+          valueClassName={currentMonthData && currentMonthData.finalNetProfit < 0 ? 'text-destructive' : 'text-primary'}
         />
         <StatCard 
-          title={`Total del Día (${selectedDate ? formatDate(format(selectedDate, 'yyyy-MM-dd'), 'd MMM') : 'N/A'})`} 
-          value={dailySummary ? formatCurrencyCOP(dailySummary.total) : formatCurrencyCOP(0)}
-          icon={DollarSign}
-          description={dailySummary ? 'Ingresos consolidados del día' : 'No hay datos para esta fecha'}
-        />
-        <StatCard 
-          title="Cuota por Miembro (Día)" 
-          value={dailySummary ? formatCurrencyCOP(dailySummary.memberShare) : formatCurrencyCOP(0)}
+          title="Cuota Neta Miembro" 
+          value={formatCurrencyCOP(currentMonthData?.netMemberShare ?? 0)}
           icon={Users}
-          description="Basado en el total diario bruto"
+          description="Beneficio final por miembro"
+          valueClassName={currentMonthData && currentMonthData.netMemberShare < 0 ? 'text-destructive' : ''}
         />
       </div>
       
@@ -220,28 +214,38 @@ export default function DashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {dailySummary ? (
+              {dailySummary || dailyExpensesTotal > 0 ? (
                   <div className="space-y-4">
-                    {LOCATION_IDS.map(locId => (
-                      <div key={locId} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 bg-background rounded-md">
-                            <MapPin className="h-5 w-5 text-primary" />
-                          </div>
-                          <span className="font-medium text-foreground">{(Object.values(LOCATIONS).find(l => l.id === locId))?.name || locId}</span>
+                            <TrendingUp className="h-5 w-5 text-green-600" />
+                            <span className="font-medium text-green-700">Ingresos Totales del Día</span>
                         </div>
-                        <span className="font-semibold text-lg text-foreground">{formatCurrencyCOP(dailySummary.locationTotals[locId])}</span>
-                      </div>
-                    ))}
+                        <span className="font-semibold text-lg text-green-600">{formatCurrencyCOP(dailySummary?.total ?? 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-red-500/10 rounded-lg">
+                        <div className="flex items-center gap-3">
+                            <TrendingDown className="h-5 w-5 text-red-600" />
+                            <span className="font-medium text-red-700">Gastos Totales del Día</span>
+                        </div>
+                        <span className="font-semibold text-lg text-red-600">{formatCurrencyCOP(dailyExpensesTotal)}</span>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-center py-8">
-                      <p className="text-muted-foreground mb-4">No se encontraron ingresos para la fecha seleccionada.</p>
-                      <Link href="/entry" passHref>
-                        <Button variant="outline">
-                          <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
-                        </Button>
-                      </Link>
+                      <p className="text-muted-foreground mb-4">No se encontraron movimientos para la fecha seleccionada.</p>
+                      <div className="flex justify-center gap-2">
+                         <Link href="/entry" passHref>
+                            <Button variant="outline" size="sm">
+                            <Edit3 className="mr-2 h-4 w-4" /> Registrar Ingresos
+                            </Button>
+                        </Link>
+                         <Link href="/expenses" passHref>
+                            <Button variant="outline" size="sm">
+                            <TrendingDown className="mr-2 h-4 w-4" /> Registrar Gastos
+                            </Button>
+                        </Link>
+                      </div>
                   </div>
                 )}
             </CardContent>
