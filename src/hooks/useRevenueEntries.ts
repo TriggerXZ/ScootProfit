@@ -14,6 +14,7 @@ import {
   getWeeklyTotals, 
   get28DayTotals,
   getCalendarMonthlyTotals,
+  getAllTimeTotal,
 } from '@/lib/calculations';
 import { LOCATION_IDS, LocationId } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -83,6 +84,11 @@ export function useRevenueEntries() {
     return getCalendarMonthlyTotals(entries, expenses, settings);
   }, [entries, settings, isSettingsLoading]);
 
+  const allTimeTotal = useCallback((expenses: Expense[] = []): AggregatedTotal | null => {
+    if (isSettingsLoading || entries.length === 0) return null;
+    return getAllTimeTotal(entries, expenses, settings);
+  }, [entries, settings, isSettingsLoading]);
+
   return {
     entries,
     isLoading: isLoading || isSettingsLoading,
@@ -93,8 +99,7 @@ export function useRevenueEntries() {
     allWeeklyTotals,
     all28DayTotals,
     allCalendarMonthlyTotals,
+    allTimeTotal,
     refreshEntries,
   };
 }
-
-    

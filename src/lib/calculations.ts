@@ -15,6 +15,7 @@ import {
   add,
   differenceInCalendarDays,
   isWithinInterval,
+  differenceInMonths,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { AppSettings } from '@/hooks/useSettings';
@@ -62,7 +63,8 @@ const calculateAggregatedTotals = (
   applyDeductionsForThisPeriod: boolean,
   periodExpenses: Expense[],
   periodInterval: Interval,
-  settings: AppSettings
+  settings: AppSettings,
+  totalMonths: number = 1,
 ): AggregatedTotal => {
   const { 
     numberOfMembers, 
@@ -89,9 +91,10 @@ const calculateAggregatedTotals = (
   let deductionsDetail: DeductionsDetail = { zonaSegura: 0, arriendo: 0, aporteCooperativa: 0, totalDeductions: 0 };
 
   if (applyDeductionsForThisPeriod && numberOfMembers > 0) {
-    const totalZonaSegura = zonaSeguraDeduction * numberOfMembers;
-    const totalArriendo = arriendoDeduction * numberOfMembers;
-    const totalAporteCooperativa = cooperativaDeduction * numberOfMembers;
+    // For historical view, scale deductions by number of months
+    const totalZonaSegura = (zonaSeguraDeduction * numberOfMembers) * totalMonths;
+    const totalArriendo = (arriendoDeduction * numberOfMembers) * totalMonths;
+    const totalAporteCooperativa = (cooperativaDeduction * numberOfMembers) * totalMonths;
     deductionsDetail = {
       zonaSegura: totalZonaSegura,
       arriendo: totalArriendo,
@@ -212,6 +215,23 @@ export function getCalendarMonthlyTotals(entries: RevenueEntry[], expenses: Expe
   return getPeriodData(entries, expenses, settings, getPeriodKeyAndInterval, getPeriodLabel, () => true);
 }
 
+export function getAllTimeTotal(entries: RevenueEntry[], expenses: Expense[], settings: AppSettings): AggregatedTotal | null {
+  if (entries.length === 0) return null;
+
+  const sortedEntries = [...entries].sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  const firstDate = parseISO(sortedEntries[0].date);
+  const lastDate = parseISO(sortedEntries[sortedEntries.length - 1].date);
+  
+  const interval = { start: firstDate, end: lastDate };
+  const periodLabel = `Histórico (${format(firstDate, 'd MMM yyyy', {locale: es})} - ${format(lastDate, 'd MMM yyyy', {locale: es})})`;
+
+  // Calculate total months for scaling fixed deductions
+  const totalMonths = differenceInMonths(lastDate, firstDate) + 1;
+
+  return calculateAggregatedTotals(entries, periodLabel, true, expenses, interval, settings, totalMonths);
+}
+
+
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings: AppSettings): string {
   const monthlyTotals = get28DayTotals(entries, [], settings); 
   
@@ -225,5 +245,3 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
-
-    

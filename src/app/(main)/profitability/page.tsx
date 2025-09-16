@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import type { AggregatedTotal, Expense } from '@/types';
@@ -13,11 +14,13 @@ import { LineChart, DollarSign, TrendingDown, TrendingUp, AlertTriangle, Scale }
 import { ProfitabilityChart } from '@/components/charts/ProfitabilityChart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatCard } from '@/components/cards/StatCard';
+import { AllTimeProfitabilityChart } from '@/components/charts/AllTimeProfitabilityChart';
 
 export default function ProfitabilityPage() {
-  const { entries, allCalendarMonthlyTotals, isLoading: isLoadingRevenues } = useRevenueEntries();
+  const { entries, allCalendarMonthlyTotals, allTimeTotal, isLoading: isLoadingRevenues } = useRevenueEntries();
   const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   
+  const [filterType, setFilterType] = useState<'monthly' | 'allTime'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
@@ -47,7 +50,11 @@ export default function ProfitabilityPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const { monthlyProfitabilityData, previousMonthlyData } = useMemo(() => {
+  const { profitabilityData, previousPeriodData } = useMemo(() => {
+    if (filterType === 'allTime') {
+        return { profitabilityData: allTimeTotal(expenses), previousPeriodData: null };
+    }
+
     const totals = allCalendarMonthlyTotals(expenses);
     const currentData = totals.find(total => {
         if (total.entries.length === 0) return false;
@@ -65,8 +72,8 @@ export default function ProfitabilityPage() {
         return getMonth(periodDate) === previousMonth && getYear(periodDate) === previousYear;
     });
     
-    return { monthlyProfitabilityData: currentData, previousMonthlyData: previousData };
-  }, [allCalendarMonthlyTotals, expenses, selectedMonth, selectedYear]);
+    return { profitabilityData: currentData, previousPeriodData: previousData };
+  }, [allCalendarMonthlyTotals, allTimeTotal, expenses, selectedMonth, selectedYear, filterType]);
 
   const isLoading = isLoadingRevenues || isLoadingExpenses;
 
@@ -82,7 +89,7 @@ export default function ProfitabilityPage() {
       );
     }
 
-    if (!monthlyProfitabilityData) {
+    if (!profitabilityData) {
       return (
         <div className="text-center py-16">
           <AlertTriangle className="mx-auto h-12 w-12 text-muted-foreground" />
@@ -99,7 +106,7 @@ export default function ProfitabilityPage() {
         deductionsDetail, 
         totalVariableExpenses, 
         finalNetProfit 
-    } = monthlyProfitabilityData;
+    } = profitabilityData;
     const isProfitable = finalNetProfit >= 0;
 
     return (
@@ -111,7 +118,7 @@ export default function ProfitabilityPage() {
                     icon={TrendingUp}
                     description="Total facturado en el período."
                     valueClassName="text-green-500"
-                    comparisonValue={previousMonthlyData?.totalRevenueInPeriod}
+                    comparisonValue={previousPeriodData?.totalRevenueInPeriod}
                 />
                  <StatCard
                     title="Costos Fijos Totales"
@@ -119,7 +126,7 @@ export default function ProfitabilityPage() {
                     icon={TrendingDown}
                     description="Deducciones (Zona Segura, Arriendo, etc.)"
                     valueClassName="text-red-500"
-                    comparisonValue={previousMonthlyData?.deductionsDetail.totalDeductions}
+                    comparisonValue={previousPeriodData?.deductionsDetail.totalDeductions}
                 />
                  <StatCard
                     title="Gastos Variables Totales"
@@ -127,7 +134,7 @@ export default function ProfitabilityPage() {
                     icon={TrendingDown}
                     description="Reparaciones, combustible, etc."
                     valueClassName="text-red-500"
-                    comparisonValue={previousMonthlyData?.totalVariableExpenses}
+                    comparisonValue={previousPeriodData?.totalVariableExpenses}
                 />
                  <StatCard
                     title={isProfitable ? 'Beneficio Neto (Ganancia)' : 'Pérdida Neta'}
@@ -135,23 +142,37 @@ export default function ProfitabilityPage() {
                     icon={Scale}
                     description="Resultado final después de todos los costos."
                     valueClassName={isProfitable ? 'text-primary' : 'text-destructive'}
-                    comparisonValue={previousMonthlyData?.finalNetProfit}
+                    comparisonValue={previousPeriodData?.finalNetProfit}
                 />
             </div>
             <Card className="shadow-xl">
                 <CardHeader>
-                    <CardTitle className="font-headline text-xl">Evolución de Ingresos vs. Gastos Diarios</CardTitle>
-                    <CardDescription>Comparativa diaria de los ingresos generados contra los gastos registrados en el período.</CardDescription>
+                    <CardTitle className="font-headline text-xl">
+                        {filterType === 'monthly'
+                            ? "Evolución de Ingresos vs. Gastos Diarios"
+                            : "Evolución de la Rentabilidad Mensual Histórica"}
+                    </CardTitle>
+                    <CardDescription>
+                         {filterType === 'monthly'
+                            ? "Comparativa diaria de los ingresos generados contra los gastos registrados en el período."
+                            : "Comparativa de ingresos, gastos y beneficios netos a lo largo de todos los meses."}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="h-96 pl-2">
-                    <ProfitabilityChart 
-                        revenueEntries={monthlyProfitabilityData.entries} 
-                        expenses={expenses.filter(e => {
-                            const expenseDate = parseISO(e.date);
-                            return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
-                        })} 
-                        totalFixedCosts={monthlyProfitabilityData.deductionsDetail.totalDeductions}
-                    />
+                    {filterType === 'monthly' ? (
+                        <ProfitabilityChart 
+                            revenueEntries={profitabilityData.entries} 
+                            expenses={expenses.filter(e => {
+                                const expenseDate = parseISO(e.date);
+                                return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
+                            })} 
+                            totalFixedCosts={profitabilityData.deductionsDetail.totalDeductions}
+                        />
+                    ) : (
+                        <AllTimeProfitabilityChart 
+                            monthlyTotals={allCalendarMonthlyTotals(expenses)}
+                        />
+                    )}
                 </CardContent>
             </Card>
         </div>
@@ -171,26 +192,36 @@ export default function ProfitabilityPage() {
                 </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Seleccionar mes" />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(month => (
-                    <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Seleccionar año" />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map(year => (
-                    <SelectItem key={year} value={String(year)}>{year}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Tabs value={filterType} onValueChange={(value) => setFilterType(value as any)}>
+                  <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="monthly">Mensual</TabsTrigger>
+                      <TabsTrigger value="allTime">Histórico</TabsTrigger>
+                  </TabsList>
+              </Tabs>
+              {filterType === 'monthly' && (
+                <>
+                  <Select value={String(selectedMonth)} onValueChange={(val) => setSelectedMonth(Number(val))}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Seleccionar mes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map(month => (
+                        <SelectItem key={month.value} value={String(month.value)}>{month.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={String(selectedYear)} onValueChange={(val) => setSelectedYear(Number(val))}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue placeholder="Seleccionar año" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearOptions.map(year => (
+                        <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
             </div>
           </div>
         </CardHeader>
