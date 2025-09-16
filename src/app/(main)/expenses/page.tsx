@@ -11,12 +11,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Download, FileText, WalletCards, TrendingDown } from 'lucide-react';
+import { Download, FileText, WalletCards, TrendingDown, PieChart } from 'lucide-react';
 import { getMonth, getYear, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportExpensesToCSV } from '@/lib/csvExport';
 import { EXPENSE_CATEGORIES } from '@/lib/constants';
 import { formatDate, formatCurrencyCOP } from '@/lib/formatters';
+import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
 
 export default function ExpenseEntryPage() {
   const { expenses, addExpense, deleteExpense, refreshExpenses } = useExpenses();
@@ -65,28 +66,8 @@ export default function ExpenseEntryPage() {
     });
   }, [expenses, selectedMonth, selectedYear, isClient]);
 
-  const { totalMonthlyExpenses, topCategory } = useMemo(() => {
-    if (filteredExpenses.length === 0) {
-        return { totalMonthlyExpenses: 0, topCategory: null };
-    }
-    
-    const total = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
-
-    const categoryTotals = filteredExpenses.reduce((acc, expense) => {
-        acc[expense.categoryId] = (acc[expense.categoryId] || 0) + expense.amount;
-        return acc;
-    }, {} as { [key: string]: number });
-
-    let topCat: { name: string; amount: number } | null = null;
-    if (Object.keys(categoryTotals).length > 0) {
-        const topCategoryId = Object.entries(categoryTotals).reduce((a, b) => a[1] > b[1] ? a : b)[0];
-        topCat = {
-            name: EXPENSE_CATEGORIES.find(c => c.id === topCategoryId)?.name || 'Desconocida',
-            amount: categoryTotals[topCategoryId]
-        };
-    }
-
-    return { totalMonthlyExpenses: total, topCategory: topCat };
+  const totalMonthlyExpenses = useMemo(() => {
+    return filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   }, [filteredExpenses]);
 
 
@@ -190,19 +171,14 @@ export default function ExpenseEntryPage() {
             <h3 className="text-sm font-medium text-muted-foreground">Total Gastado en el Mes</h3>
             <p className="text-4xl font-bold font-headline text-destructive">{formatCurrencyCOP(totalMonthlyExpenses)}</p>
           </div>
-          <div className="flex flex-col justify-center p-6 bg-muted/50 rounded-lg">
-            {topCategory ? (
-              <>
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <TrendingDown className="h-4 w-4" />
-                  Categoría Principal de Gasto
-                </h3>
-                <p className="text-2xl font-bold font-headline text-foreground">{topCategory.name}</p>
-                <p className="text-lg font-semibold text-red-500">{formatCurrencyCOP(topCategory.amount)}</p>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-center">No hay gastos para analizar la categoría principal.</p>
-            )}
+          <div className="flex flex-col p-6 bg-muted/50 rounded-lg">
+            <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <PieChart className="h-4 w-4" />
+                Distribución por Categoría
+            </h3>
+            <div className="h-32">
+                <ExpenseCategoryChart expenses={filteredExpenses} />
+            </div>
           </div>
         </CardContent>
       </Card>

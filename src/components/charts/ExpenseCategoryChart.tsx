@@ -79,5 +79,3 @@ export function ExpenseCategoryChart({ expenses }: ExpenseCategoryChartProps) {
     </ChartContainer>
   );
 }
-
-    
