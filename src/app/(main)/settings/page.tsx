@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, Download, Upload, AlertTriangle, Copy, ClipboardPaste } from 'lucide-react';
+import { Settings, AlertTriangle, Copy, ClipboardPaste } from 'lucide-react';
 import { LOCAL_STORAGE_SETTINGS_KEY, LOCAL_STORAGE_REVENUE_KEY, LOCAL_STORAGE_EXPENSES_KEY } from '@/lib/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { Separator } from '@/components/ui/separator';
@@ -68,58 +68,6 @@ export default function SettingsPage() {
     };
 
     return JSON.stringify(dataToExport, null, 2);
-  };
-  
-  const handleExportData = () => {
-    try {
-        const dataStr = getAllDataAsJSON();
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.href = url;
-        const date = new Date().toISOString().split('T')[0];
-        link.download = `scootprofit_backup_${date}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        toast({
-            title: "Exportación Exitosa",
-            description: "Todos tus datos han sido guardados en un archivo JSON.",
-        });
-    } catch (error) {
-        console.error("Error exporting data:", error);
-        toast({
-            title: "Error de Exportación",
-            description: "No se pudieron exportar los datos. Revisa la consola para más detalles.",
-            variant: "destructive",
-        });
-    }
-  };
-
-  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const text = e.target?.result;
-            if (typeof text !== 'string') throw new Error("File content is not readable");
-            restoreDataFromJSON(text);
-        } catch (error: any) {
-            console.error("Error importing data:", error);
-            toast({
-                title: "Error de Importación",
-                description: error.message || "El archivo está dañado o no tiene el formato correcto.",
-                variant: "destructive",
-            });
-        }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
   };
   
   const restoreDataFromJSON = (jsonData: string) => {
@@ -326,67 +274,6 @@ export default function SettingsPage() {
 
       <Separator />
 
-      <Card className="w-full max-w-2xl mx-auto shadow-xl border-border">
-        <CardHeader>
-           <div className="flex items-center gap-3">
-            <Upload className="h-7 w-7 text-primary" />
-            <CardTitle className="font-headline text-2xl">Migración de Datos (Archivos)</CardTitle>
-          </div>
-          <CardDescription>
-            Crea una copia de seguridad de todos tus datos (ingresos, gastos y configuración) o restaura desde un archivo.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Exportar Datos</h3>
-            <p className="text-sm text-muted-foreground">
-              Guarda todos tus datos en un único archivo JSON. Mantenlo en un lugar seguro.
-            </p>
-            <Button onClick={handleExportData} variant="outline" className="mt-2">
-              <Download className="mr-2 h-4 w-4" />
-              Descargar Copia de Seguridad
-            </Button>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <h3 className="font-semibold">Importar Datos</h3>
-            <p className="text-sm text-muted-foreground">
-              Selecciona un archivo de copia de seguridad para restaurar tus datos.
-            </p>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="mt-2">
-                  <Upload className="mr-2 h-4 w-4" />
-                  Restaurar desde Archivo
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="flex items-center gap-2">
-                    <AlertTriangle className="h-6 w-6 text-destructive" />
-                    ¿Estás seguro?
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta acción es irreversible. Se borrarán todos los datos actuales de la aplicación y se reemplazarán con los datos del archivo que selecciones. Asegúrate de haber seleccionado el archivo correcto.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction asChild>
-                     <Label htmlFor="import-file" className="bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer">
-                        Sí, reemplazar datos
-                        <Input id="import-file" type="file" accept=".json" className="hidden" onChange={handleImportData} />
-                     </Label>
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Separator />
-
        <Card className="w-full max-w-2xl mx-auto shadow-xl border-border">
         <CardHeader>
            <div className="flex items-center gap-3">
@@ -458,6 +345,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-
-
-    
