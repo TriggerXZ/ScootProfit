@@ -39,7 +39,6 @@ export async function analyzePerformance(input: AnalyzePerformanceInput): Promis
 // Define the Genkit prompt for the AI model.
 const performanceAnalysisPrompt = ai.definePrompt({
   name: 'performanceAnalysisPrompt',
-  model: 'googleai/gemini-1.5-flash',
   input: { schema: AnalyzePerformanceInputSchema },
   output: { schema: AnalyzePerformanceOutputSchema },
   prompt: `

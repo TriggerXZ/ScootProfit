@@ -36,7 +36,6 @@ export async function predictMonthlyIncome(input: PredictMonthlyIncomeInput): Pr
 // Define the Genkit prompt for the AI model.
 const incomePredictionPrompt = ai.definePrompt({
   name: 'incomePredictionPrompt',
-  model: 'googleai/gemini-1.5-flash',
   input: { schema: PredictMonthlyIncomeInputSchema },
   output: { schema: PredictMonthlyIncomeOutputSchema },
   prompt: `

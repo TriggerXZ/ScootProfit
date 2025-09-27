@@ -29,7 +29,6 @@ export async function translateText(input: TranslateTextInput): Promise<Translat
 
 const translationPrompt = ai.definePrompt({
   name: 'translationPrompt',
-  model: 'googleai/gemini-1.5-flash',
   input: { schema: TranslateTextInputSchema },
   output: { schema: TranslateTextOutputSchema },
   prompt: `Translate the following text to {{{targetLanguage}}}. Respond only with the translated text.
