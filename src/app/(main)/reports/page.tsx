@@ -10,37 +10,19 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileText, BarChart2, BrainCircuit, Lightbulb, TrendingDown as TrendingDownIcon, CheckCircle, Languages, Users } from 'lucide-react';
+import { FileText, BarChart2 } from 'lucide-react';
 import type { AggregatedTotal, RevenueEntry } from '@/types';
-import { formatCurrencyCOP } from '@/lib/formatters';
-import { GROUPS, LOCATIONS } from '@/lib/constants';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
-import { analyzePerformance, AnalyzePerformanceOutput } from '@/ai/flows/analyze-performance-flow';
-import { translateText } from '@/ai/flows/translate-text-flow';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getGroupForLocationOnDate } from '@/lib/calculations';
 
-type TranslatedAnalysis = {
-    executiveSummary?: string;
-    positiveObservations?: string[];
-    areasForImprovement?: string[];
-    recommendations?: string[];
-    groupComparison?: string;
-};
 
 export default function ReportsPage() {
   const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, entries, isLoading: isLoadingRevenues } = useRevenueEntries();
   const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const [activeTab, setActiveTab] = useState('weekly');
   
-  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<AnalyzePerformanceOutput | null>(null);
-  const [translatedAnalysis, setTranslatedAnalysis] = useState<TranslatedAnalysis | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-
   const [filterType, setFilterType] = useState<'monthly' | 'allTime'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
@@ -103,80 +85,6 @@ export default function ReportsPage() {
   }, [entries, filterType, selectedMonth, selectedYear]);
   
   const isLoading = isLoadingRevenues || isLoadingExpenses;
-
-  const handleAnalyzeClick = async () => {
-    setIsAnalysisLoading(true);
-    setAnalysisResult(null);
-    setTranslatedAnalysis(null);
-    setShowAnalysisDialog(true);
-    try {
-      const groupTotalsString = Object.entries(groupTotals).map(([key, value]) => `${(GROUPS as any)[Object.keys(GROUPS).find(k => GROUPS[k as keyof typeof GROUPS].id === key) as any]?.name || key}: ${formatCurrencyCOP(value)}`).join(', ');
-      const locationTotalsString = Object.entries(locationTotals).map(([key, value]) => `${(LOCATIONS as any)[Object.keys(LOCATIONS).find(k => LOCATIONS[k as keyof typeof LOCATIONS].id === key) as any]?.name || key}: ${formatCurrencyCOP(value)}`).join(', ');
-
-      if (!groupTotalsString || !locationTotalsString || Object.keys(groupTotals).length < 1) {
-        setAnalysisResult({
-            executiveSummary: "No hay suficientes datos para un análisis.",
-            positiveObservations: [],
-            areasForImprovement: ["Se necesita al menos un período completo de datos para realizar un análisis significativo."],
-            recommendations: [],
-            groupComparison: "No hay datos suficientes para una comparación."
-        });
-        return;
-      }
-
-      const result = await analyzePerformance({ groupTotals: groupTotalsString, locationTotals: locationTotalsString });
-      setAnalysisResult(result);
-    } catch (error: any) {
-        let errorMessage = "Ocurrió un error al contactar con el servicio de IA. Revisa la configuración de tu clave de API de Gemini o inténtalo de nuevo más tarde.";
-        if (error.message && (error.message.includes("overloaded") || error.message.includes("503"))) {
-            errorMessage = "El modelo de IA está actualmente sobrecargado. Por favor, inténtalo de nuevo en unos minutos.";
-        }
-        console.error("Analysis failed", error);
-        setAnalysisResult({
-            executiveSummary: "Error al realizar el análisis.",
-            positiveObservations: [],
-            areasForImprovement: [errorMessage],
-            recommendations: [],
-            groupComparison: "El análisis falló."
-        });
-    } finally {
-      setIsAnalysisLoading(false);
-    }
-  };
-
-  const handleTranslateAnalysis = async () => {
-      if (!analysisResult) return;
-      setIsTranslating(true);
-      
-      const translate = async (text: string) => text ? (await translateText({ text, targetLanguage: 'Spanish' })).translatedText : "";
-      const translateArray = (arr: string[]) => Promise.all(arr.map(item => translate(item)));
-
-      try {
-          const [summary, positives, improvements, recs, comparison] = await Promise.all([
-              translate(analysisResult.executiveSummary),
-              translateArray(analysisResult.positiveObservations),
-              translateArray(analysisResult.areasForImprovement),
-              translateArray(analysisResult.recommendations),
-              translate(analysisResult.groupComparison)
-          ]);
-          setTranslatedAnalysis({
-              executiveSummary: summary,
-              positiveObservations: positives,
-              areasForImprovement: improvements,
-              recommendations: recs,
-              groupComparison: comparison
-          });
-      } catch (error) {
-          console.error("Translation failed", error);
-          let errorMessage = "La traducción no pudo ser completada. Por favor, inténtelo de nuevo.";
-          if (error instanceof Error && (error.message.includes("overloaded") || error.message.includes("503"))) {
-            errorMessage = "El servicio de traducción está sobrecargado. Inténtalo de nuevo en unos momentos.";
-          }
-          setTranslatedAnalysis({ executiveSummary: errorMessage });
-      } finally {
-          setIsTranslating(false);
-      }
-  };
 
   const handleDownloadInvoicePDF = async (item: AggregatedTotal) => {
     const html2pdf = (await import('html2pdf.js')).default;
@@ -323,10 +231,6 @@ export default function ReportsPage() {
                         </Select>
                     </>
                 )}
-                <Button onClick={handleAnalyzeClick} variant="outline" size="sm" disabled={isAnalysisLoading || isLoading || Object.keys(groupTotals).length === 0}>
-                    <BrainCircuit className="mr-2 h-4 w-4" />
-                    Analizar con IA
-                </Button>
             </div>
           </div>
           <CardDescription>
@@ -384,109 +288,8 @@ export default function ReportsPage() {
         </Tabs>
       </div>
 
-       <AlertDialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
-            <AlertDialogContent className="max-w-2xl">
-            <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center justify-between font-headline text-2xl">
-                    <div className="flex items-center gap-2">
-                        <BrainCircuit className="h-7 w-7 text-primary" />
-                        Análisis de Rendimiento con IA
-                    </div>
-                     {!translatedAnalysis && !isAnalysisLoading && analysisResult && (
-                        <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={handleTranslateAnalysis} 
-                            disabled={isTranslating}
-                            className="text-xs"
-                        >
-                            <Languages className="mr-2 h-4 w-4" />
-                            {isTranslating ? 'Traduciendo...' : 'Traducir'}
-                        </Button>
-                     )}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                {isAnalysisLoading
-                    ? "Analizando el rendimiento histórico de tus grupos y ubicaciones..."
-                    : "La IA ha procesado tus datos para generar los siguientes insights:"}
-                </AlertDialogDescription>
-            </AlertDialogHeader>
-            
-            {isAnalysisLoading ? (
-                <div className="flex justify-center items-center h-48">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                </div>
-            ) : (
-                analysisResult && (
-                <div className="my-4 text-sm space-y-6 max-h-[60vh] overflow-y-auto pr-2">
-                    <div>
-                        <h3 className="font-semibold text-foreground mb-2">Resumen Ejecutivo</h3>
-                        <p className="text-muted-foreground bg-muted/50 p-3 rounded-md italic">
-                           {translatedAnalysis?.executiveSummary || analysisResult.executiveSummary}
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                <CheckCircle className="h-5 w-5 text-green-500" />
-                                Observaciones Positivas
-                            </h3>
-                            <ul className="space-y-2">
-                                {(translatedAnalysis?.positiveObservations || analysisResult.positiveObservations).map((item, index) => (
-                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-green-500/10 text-green-700 italic">
-                                        <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                        <div>
-                             <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                <TrendingDownIcon className="h-5 w-5 text-amber-500" />
-                                Áreas de Mejora
-                            </h3>
-                            <ul className="space-y-2">
-                                {(translatedAnalysis?.areasForImprovement || analysisResult.areasForImprovement).map((item, index) => (
-                                    <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-amber-500/10 text-amber-700 italic">
-                                        <TrendingDownIcon className="h-4 w-4 mt-0.5 shrink-0" />
-                                        <span>{item}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                     <div>
-                        <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2"><Users className="h-5 w-5 text-indigo-500" />Comparativa de Grupos</h3>
-                        <p className="text-muted-foreground bg-indigo-500/10 p-3 rounded-md italic">
-                           {translatedAnalysis?.groupComparison || analysisResult.groupComparison}
-                        </p>
-                    </div>
-                    
-                    <div>
-                        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                            <Lightbulb className="h-5 w-5 text-primary" />
-                            Recomendaciones
-                        </h3>
-                         <ul className="space-y-2">
-                            {(translatedAnalysis?.recommendations || analysisResult.recommendations).map((item, index) => (
-                                <li key={index} className="flex items-start gap-2 p-2 rounded-md bg-primary/10 text-primary italic">
-                                    <Lightbulb className="h-4 w-4 mt-0.5 shrink-0" />
-                                    <span>{item}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    </div>
-                )
-            )}
-            
-            <AlertDialogFooter>
-                <AlertDialogAction onClick={() => setShowAnalysisDialog(false)}>Entendido</AlertDialogAction>
-            </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
     </div>
   );
 }
+
+    

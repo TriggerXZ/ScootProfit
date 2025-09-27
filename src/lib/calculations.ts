@@ -245,3 +245,5 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
+
+    
