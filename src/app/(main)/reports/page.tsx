@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AggregatedSummarySection } from '@/components/sections/AggregatedSummarySection';
 import { GroupPerformanceChart } from '@/components/charts/GroupPerformanceChart';
@@ -11,21 +11,27 @@ import { useExpenses } from '@/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { FileText, BarChart2 } from 'lucide-react';
-import type { AggregatedTotal, RevenueEntry } from '@/types';
+import type { AggregatedTotal, RevenueEntry, Expense } from '@/types';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getGroupForLocationOnDate } from '@/lib/calculations';
+import { formatCurrencyCOP } from '@/lib/formatters';
+import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
 
 
 export default function ReportsPage() {
-  const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, entries, isLoading: isLoadingRevenues } = useRevenueEntries();
+  const { allWeeklyTotals, all28DayTotals, allCalendarMonthlyTotals, allTimeTotal, entries, isLoading: isLoadingRevenues } = useRevenueEntries();
   const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const [activeTab, setActiveTab] = useState('weekly');
   
   const [filterType, setFilterType] = useState<'monthly' | 'allTime'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+
+  const groupChartRef = useRef<HTMLDivElement>(null);
+  const locationChartRef = useRef<HTMLDivElement>(null);
+  const expensesChartRef = useRef<HTMLDivElement>(null);
 
   const { yearOptions, monthOptions } = useMemo(() => {
     if (entries.length === 0) {
@@ -53,36 +59,53 @@ export default function ReportsPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const { groupTotals, locationTotals } = useMemo(() => {
-      const groupMap: { [key: string]: number } = {};
-      const locationMap: { [key: string]: number } = {};
+  const { groupTotals, locationTotals, summaryData, filteredExpenses } = useMemo(() => {
+    const groupMap: { [key: string]: number } = {};
+    const locationMap: { [key: string]: number } = {};
 
-      let entriesToAnalyze: RevenueEntry[] = [];
+    let entriesToAnalyze: RevenueEntry[] = [];
+    let expensesToAnalyze: Expense[] = [];
+    let summary: AggregatedTotal | null = null;
+    const allMonthlyTotals = allCalendarMonthlyTotals(expenses);
+    
+    if (filterType === 'allTime') {
+        entriesToAnalyze = entries;
+        expensesToAnalyze = expenses;
+        summary = allTimeTotal(expenses);
+    } else {
+        entriesToAnalyze = entries.filter(entry => {
+            const entryDate = parseISO(entry.date);
+            return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
+        });
+        expensesToAnalyze = expenses.filter(expense => {
+            const expenseDate = parseISO(expense.date);
+            return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
+        });
+        summary = allMonthlyTotals.find(total => {
+            if (total.entries.length === 0) return false;
+            const periodDate = parseISO(total.entries[0].date);
+            return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
+        }) ?? null;
+    }
 
-      if (filterType === 'allTime') {
-          entriesToAnalyze = entries;
-      } else {
-          entriesToAnalyze = entries.filter(entry => {
-              const entryDate = parseISO(entry.date);
-              return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
-          });
-      }
+    entriesToAnalyze.forEach(entry => {
+        const entryDate = parseISO(entry.date);
+        for (const [location, revenue] of Object.entries(entry.revenues)) {
+            locationMap[location] = (locationMap[location] || 0) + revenue;
+        }
+        for (const [locationId, revenue] of Object.entries(entry.revenues)) {
+            const group = getGroupForLocationOnDate(locationId as any, entryDate);
+            groupMap[group] = (groupMap[group] || 0) + revenue;
+        }
+    });
 
-      entriesToAnalyze.forEach(entry => {
-          const entryDate = parseISO(entry.date);
-          // Aggregate location totals
-          for (const [location, revenue] of Object.entries(entry.revenues)) {
-              locationMap[location] = (locationMap[location] || 0) + revenue;
-          }
-          // Aggregate group totals
-          for (const [locationId, revenue] of Object.entries(entry.revenues)) {
-              const group = getGroupForLocationOnDate(locationId as any, entryDate);
-              groupMap[group] = (groupMap[group] || 0) + revenue;
-          }
-      });
-
-      return { groupTotals: groupMap, locationTotals: locationMap };
-  }, [entries, filterType, selectedMonth, selectedYear]);
+    return { 
+        groupTotals: groupMap, 
+        locationTotals: locationMap,
+        summaryData: summary,
+        filteredExpenses: expensesToAnalyze
+    };
+  }, [entries, expenses, filterType, selectedMonth, selectedYear, allCalendarMonthlyTotals, allTimeTotal]);
   
   const isLoading = isLoadingRevenues || isLoadingExpenses;
 
@@ -185,6 +208,116 @@ export default function ReportsPage() {
     }
   };
 
+  const handleDownloadSummaryPDF = async () => {
+    if (!summaryData) {
+        alert("No hay datos de resumen para exportar.");
+        return;
+    }
+    const html2pdf = (await import('html2pdf.js')).default;
+    const { es: localeEs } = await import('date-fns/locale/es');
+
+    const groupChartContainer = groupChartRef.current;
+    const locationChartContainer = locationChartRef.current;
+    const expensesChartContainer = expensesChartRef.current;
+
+    if (!groupChartContainer || !locationChartContainer || !expensesChartContainer) return;
+
+    // Temporarily make charts visible if they are not, to render them
+    const originalGroupDisplay = groupChartContainer.style.display;
+    const originalLocationDisplay = locationChartContainer.style.display;
+    const originalExpensesDisplay = expensesChartContainer.style.display;
+    groupChartContainer.style.display = 'block';
+    locationChartContainer.style.display = 'block';
+    expensesChartContainer.style.display = 'block';
+
+    const [groupCanvas, locationCanvas, expensesCanvas] = await Promise.all([
+        (await import('html2canvas')).default(groupChartContainer, { scale: 2, backgroundColor: null }),
+        (await import('html2canvas')).default(locationChartContainer, { scale: 2, backgroundColor: null }),
+        (await import('html2canvas')).default(expensesChartContainer, { scale: 2, backgroundColor: null }),
+    ]);
+
+    // Restore original display
+    groupChartContainer.style.display = originalGroupDisplay;
+    locationChartContainer.style.display = originalLocationDisplay;
+    expensesChartContainer.style.display = originalExpensesDisplay;
+
+    const groupChartImg = groupCanvas.toDataURL('image/png');
+    const locationChartImg = locationCanvas.toDataURL('image/png');
+    const expensesChartImg = expensesCanvas.toDataURL('image/png');
+
+    const periodName = summaryData.period;
+    const currentDate = format(new Date(), 'PPP', { locale: localeEs });
+    
+    const summaryHTML = `
+      <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5; color: #333;">
+        <header style="text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px;">
+          <h1 style="font-size: 24px; color: #1a1a1a; margin: 0;">Resumen Ejecutivo</h1>
+          <h2 style="font-size: 16px; color: #555; margin: 5px 0 0 0;">${periodName}</h2>
+          <p style="font-size: 12px; color: #888; margin-top: 8px;">Generado el ${currentDate}</p>
+        </header>
+        
+        <section>
+          <h3 style="font-size: 16px; color: #1a1a1a; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 15px;">Resumen Financiero</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 8px; border: 1px solid #ddd;">Ingresos Brutos Totales</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: #28a745;">${formatCurrencyCOP(summaryData.totalRevenueInPeriod)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd;">Costos Fijos Totales</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">(${formatCurrencyCOP(summaryData.deductionsDetail.totalDeductions)})</td>
+            </tr>
+            <tr style="background-color: #f9f9f9;">
+              <td style="padding: 8px; border: 1px solid #ddd;">Gastos Variables Totales</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">(${formatCurrencyCOP(summaryData.totalVariableExpenses)})</td>
+            </tr>
+            <tr style="border-top: 2px solid #333;">
+              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 13pt;">Beneficio Neto Final</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 13pt; color: ${summaryData.finalNetProfit >= 0 ? '#0056b3' : '#dc3545'};">${formatCurrencyCOP(summaryData.finalNetProfit)}</td>
+            </tr>
+          </tbody>
+        </table>
+        </section>
+
+        <section style="margin-top: 30px; page-break-before: auto;">
+          <h3 style="font-size: 16px; color: #1a1a1a; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 15px;">Análisis de Rendimiento</h3>
+          <div style="display: flex; flex-direction: row; justify-content: space-between; gap: 20px;">
+             <div style="width: 48%; text-align: center;">
+                <h4 style="font-size: 12px; margin-bottom: 10px;">Ingresos por Grupo</h4>
+                <img src="${groupChartImg}" style="width: 100%; height: auto; border: 1px solid #eee; border-radius: 5px;" />
+            </div>
+            <div style="width: 48%; text-align: center;">
+                <h4 style="font-size: 12px; margin-bottom: 10px;">Ingresos por Ubicación</h4>
+                <img src="${locationChartImg}" style="width: 100%; height: auto; border: 1px solid #eee; border-radius: 5px;" />
+            </div>
+          </div>
+        </section>
+
+        ${filteredExpenses.length > 0 ? `
+        <section style="margin-top: 30px; page-break-before: auto;">
+            <h3 style="font-size: 16px; color: #1a1a1a; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-bottom: 15px;">Desglose de Gastos del Período</h3>
+            <div style="text-align: center;">
+                 <img src="${expensesChartImg}" style="max-width: 60%; height: auto; margin: 0 auto; border: 1px solid #eee; border-radius: 5px;" />
+            </div>
+        </section>
+        ` : ''}
+
+        <footer style="text-align: center; margin-top: 40px; font-size: 9pt; color: #777; border-top: 1px solid #eee; padding-top: 10px;">
+          Reporte generado por ScootProfit
+        </footer>
+      </div>
+    `;
+
+    const options = {
+      margin: 10,
+      filename: `resumen_${periodName.toLowerCase().replace(/\s/g, '_').replace(/[^a-z0-9_]/g, '')}.pdf`,
+      image: { type: 'png', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    };
+
+    html2pdf().from(summaryHTML).set(options).save();
+  };
 
   return (
     <div className="space-y-8">
@@ -231,6 +364,10 @@ export default function ReportsPage() {
                         </Select>
                     </>
                 )}
+                 <Button onClick={handleDownloadSummaryPDF} variant="outline" disabled={!summaryData || isLoading}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Descargar Resumen
+                </Button>
             </div>
           </div>
           <CardDescription>
@@ -240,17 +377,22 @@ export default function ReportsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-8 md:grid-cols-2 pt-4">
-          <div className="h-80">
+          <div className="h-80" ref={groupChartRef}>
             <h3 className="font-semibold mb-2 text-center">Rendimiento por Grupo</h3>
             <GroupPerformanceChart groupTotals={groupTotals} />
           </div>
-          <div className="h-80">
+          <div className="h-80" ref={locationChartRef}>
             <h3 className="font-semibold mb-2 text-center">Ingresos por Ubicación</h3>
             <LocationPerformanceChart locationTotals={locationTotals} />
           </div>
         </CardContent>
       </Card>
       
+      {/* Hidden container for the expenses chart for PDF generation */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', width: '400px', height: '300px' }} ref={expensesChartRef}>
+          <ExpenseCategoryChart expenses={filteredExpenses} />
+      </div>
+
       <div>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
           <h2 className="text-2xl font-headline font-bold text-foreground">Desglose de Períodos</h2>
@@ -292,4 +434,3 @@ export default function ReportsPage() {
   );
 }
 
-    
