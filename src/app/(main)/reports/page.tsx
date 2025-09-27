@@ -10,9 +10,9 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileText, BarChart2 } from 'lucide-react';
+import { FileText, BarChart2, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import type { AggregatedTotal, RevenueEntry, Expense } from '@/types';
-import { format, getMonth, getYear, parseISO } from 'date-fns';
+import { format, getMonth, getYear, parseISO, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getGroupForLocationOnDate } from '@/lib/calculations';
@@ -59,53 +59,67 @@ export default function ReportsPage() {
     return { yearOptions: years, monthOptions: months };
   }, [entries]);
 
-  const { groupTotals, locationTotals, summaryData, filteredExpenses } = useMemo(() => {
-    const groupMap: { [key: string]: number } = {};
-    const locationMap: { [key: string]: number } = {};
+    const { groupTotals, locationTotals, summaryData, previousPeriodData, filteredExpenses } = useMemo(() => {
+        const groupMap: { [key: string]: number } = {};
+        const locationMap: { [key: string]: number } = {};
 
-    let entriesToAnalyze: RevenueEntry[] = [];
-    let expensesToAnalyze: Expense[] = [];
-    let summary: AggregatedTotal | null = null;
-    const allMonthlyTotals = allCalendarMonthlyTotals(expenses);
-    
-    if (filterType === 'allTime') {
-        entriesToAnalyze = entries;
-        expensesToAnalyze = expenses;
-        summary = allTimeTotal(expenses);
-    } else {
-        entriesToAnalyze = entries.filter(entry => {
+        let entriesToAnalyze: RevenueEntry[] = [];
+        let expensesToAnalyze: Expense[] = [];
+        let summary: AggregatedTotal | null = null;
+        let previousSummary: AggregatedTotal | null = null;
+
+        const allMonthlyTotals = allCalendarMonthlyTotals(expenses);
+
+        if (filterType === 'allTime') {
+            entriesToAnalyze = entries;
+            expensesToAnalyze = expenses;
+            summary = allTimeTotal(expenses);
+            previousSummary = null; // No previous period for "all time"
+        } else {
+            const currentPeriodDate = new Date(selectedYear, selectedMonth);
+            summary = allMonthlyTotals.find(total => {
+                if (total.entries.length === 0) return false;
+                const periodDate = parseISO(total.entries[0].date);
+                return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
+            }) ?? null;
+
+            if(summary) {
+                entriesToAnalyze = summary.entries;
+                expensesToAnalyze = expenses.filter(expense => {
+                    const expenseDate = parseISO(expense.date);
+                    return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
+                });
+            }
+
+            const previousMonthDate = subMonths(currentPeriodDate, 1);
+            const prevMonth = getMonth(previousMonthDate);
+            const prevYear = getYear(previousMonthDate);
+            previousSummary = allMonthlyTotals.find(total => {
+                if (total.entries.length === 0) return false;
+                const periodDate = parseISO(total.entries[0].date);
+                return getMonth(periodDate) === prevMonth && getYear(periodDate) === prevYear;
+            }) ?? null;
+        }
+
+        entriesToAnalyze.forEach(entry => {
             const entryDate = parseISO(entry.date);
-            return getMonth(entryDate) === selectedMonth && getYear(entryDate) === selectedYear;
+            for (const [location, revenue] of Object.entries(entry.revenues)) {
+                locationMap[location] = (locationMap[location] || 0) + revenue;
+            }
+            for (const [locationId, revenue] of Object.entries(entry.revenues)) {
+                const group = getGroupForLocationOnDate(locationId as any, entryDate);
+                groupMap[group] = (groupMap[group] || 0) + revenue;
+            }
         });
-        expensesToAnalyze = expenses.filter(expense => {
-            const expenseDate = parseISO(expense.date);
-            return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
-        });
-        summary = allMonthlyTotals.find(total => {
-            if (total.entries.length === 0) return false;
-            const periodDate = parseISO(total.entries[0].date);
-            return getMonth(periodDate) === selectedMonth && getYear(periodDate) === selectedYear;
-        }) ?? null;
-    }
 
-    entriesToAnalyze.forEach(entry => {
-        const entryDate = parseISO(entry.date);
-        for (const [location, revenue] of Object.entries(entry.revenues)) {
-            locationMap[location] = (locationMap[location] || 0) + revenue;
-        }
-        for (const [locationId, revenue] of Object.entries(entry.revenues)) {
-            const group = getGroupForLocationOnDate(locationId as any, entryDate);
-            groupMap[group] = (groupMap[group] || 0) + revenue;
-        }
-    });
-
-    return { 
-        groupTotals: groupMap, 
-        locationTotals: locationMap,
-        summaryData: summary,
-        filteredExpenses: expensesToAnalyze
-    };
-  }, [entries, expenses, filterType, selectedMonth, selectedYear, allCalendarMonthlyTotals, allTimeTotal]);
+        return {
+            groupTotals: groupMap,
+            locationTotals: locationMap,
+            summaryData: summary,
+            previousPeriodData: previousSummary,
+            filteredExpenses: expensesToAnalyze
+        };
+    }, [entries, expenses, filterType, selectedMonth, selectedYear, allCalendarMonthlyTotals, allTimeTotal]);
   
   const isLoading = isLoadingRevenues || isLoadingExpenses;
 
@@ -247,7 +261,16 @@ export default function ReportsPage() {
 
     const periodName = summaryData.period;
     const currentDate = format(new Date(), 'PPP', { locale: localeEs });
-    
+
+    const getChangeIndicator = (current: number, previous: number | undefined) => {
+        if (previous === undefined || previous === null) return '';
+        if (previous === 0) return current > 0 ? `<span style="color: #28a745;"> (+100%+)</span>` : '';
+        const change = ((current - previous) / Math.abs(previous)) * 100;
+        const color = change >= 0 ? '#28a745' : '#dc3545';
+        const sign = change >= 0 ? '+' : '';
+        return `<span style="font-size: 10pt; color: ${color};"> (${sign}${change.toFixed(1)}%)</span>`;
+    };
+
     const summaryHTML = `
       <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5; color: #333;">
         <header style="text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 15px; margin-bottom: 20px;">
@@ -261,19 +284,38 @@ export default function ReportsPage() {
           <table style="width: 100%; border-collapse: collapse; font-size: 11pt;">
             <tr style="background-color: #f9f9f9;">
               <td style="padding: 8px; border: 1px solid #ddd;">Ingresos Brutos Totales</td>
-              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: #28a745;">${formatCurrencyCOP(summaryData.totalRevenueInPeriod)}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; color: #28a745;">
+                ${formatCurrencyCOP(summaryData.totalRevenueInPeriod)}
+                ${getChangeIndicator(summaryData.totalRevenueInPeriod, previousPeriodData?.totalRevenueInPeriod)}
+              </td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd;">Costos Fijos Totales</td>
-              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">(${formatCurrencyCOP(summaryData.deductionsDetail.totalDeductions)})</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">
+                (${formatCurrencyCOP(summaryData.deductionsDetail.totalDeductions)})
+                ${getChangeIndicator(summaryData.deductionsDetail.totalDeductions, previousPeriodData?.deductionsDetail.totalDeductions)}
+              </td>
             </tr>
             <tr style="background-color: #f9f9f9;">
               <td style="padding: 8px; border: 1px solid #ddd;">Gastos Variables Totales</td>
-              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">(${formatCurrencyCOP(summaryData.totalVariableExpenses)})</td>
+              <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">
+                (${formatCurrencyCOP(summaryData.totalVariableExpenses)})
+                ${getChangeIndicator(summaryData.totalVariableExpenses, previousPeriodData?.totalVariableExpenses)}
+              </td>
             </tr>
             <tr style="border-top: 2px solid #333;">
               <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 13pt;">Beneficio Neto Final</td>
-              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 13pt; color: ${summaryData.finalNetProfit >= 0 ? '#0056b3' : '#dc3545'};">${formatCurrencyCOP(summaryData.finalNetProfit)}</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 13pt; color: ${summaryData.finalNetProfit >= 0 ? '#0056b3' : '#dc3545'};">
+                ${formatCurrencyCOP(summaryData.finalNetProfit)}
+                 ${getChangeIndicator(summaryData.finalNetProfit, previousPeriodData?.finalNetProfit)}
+              </td>
+            </tr>
+             <tr style="border-top: 1px solid #ccc;">
+              <td style="padding: 10px 8px; border: 1px solid #ddd; font-weight: bold; font-size: 13pt;">Cuota Neta por Miembro</td>
+              <td style="padding: 10px 8px; border: 1px solid #ddd; text-align: right; font-weight: bold; font-size: 13pt; color: ${summaryData.netMemberShare >= 0 ? '#0056b3' : '#dc3545'};">
+                ${formatCurrencyCOP(summaryData.netMemberShare)}
+                 ${getChangeIndicator(summaryData.netMemberShare, previousPeriodData?.netMemberShare)}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -434,3 +476,7 @@ export default function ReportsPage() {
   );
 }
 
+
+
+
+    
