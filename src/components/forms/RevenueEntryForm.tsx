@@ -93,7 +93,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
   
   useEffect(() => {
     if (editingEntry) {
-      const entryDate = parseISO(editingEntry.date);
+      const entryDate = addDays(parseISO(editingEntry.date), 0); // Clone to avoid mutation issues
       setSelectedDate(entryDate);
       setValue("date", entryDate, { shouldValidate: true });
       LOCATION_IDS.forEach(locId => {
