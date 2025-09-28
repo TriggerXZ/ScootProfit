@@ -67,7 +67,7 @@ export function ExpenseEntryForm({
   const { control, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
     defaultValues: {
-      date: new Date(),
+      date: undefined, // Initialize as undefined to prevent hydration mismatch
       description: "",
       amount: 0,
       categoryId: undefined,
@@ -78,6 +78,7 @@ export function ExpenseEntryForm({
   const watchedAmount = watch("amount");
 
   useEffect(() => {
+    // Set client-side date only after mount
     const today = new Date();
     setClientToday(today);
     if (!editingExpense) {
