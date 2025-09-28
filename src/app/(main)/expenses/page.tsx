@@ -12,12 +12,13 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Download, FileText, WalletCards, TrendingDown, PieChart } from 'lucide-react';
-import { getMonth, getYear, parseISO, format } from 'date-fns';
+import { getMonth, getYear, parseISO, format, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { exportExpensesToCSV } from '@/lib/csvExport';
 import { EXPENSE_CATEGORIES } from '@/lib/constants';
 import { formatDate, formatCurrencyCOP } from '@/lib/formatters';
 import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
+import { StatCard } from '@/components/cards/StatCard';
 
 export default function ExpenseEntryPage() {
   const { expenses, addExpense, deleteExpense, refreshExpenses } = useExpenses();
@@ -58,17 +59,33 @@ export default function ExpenseEntryPage() {
     }
   };
 
-  const filteredExpenses = useMemo(() => {
-    if (!isClient) return [];
-    return expenses.filter(expense => {
+  const { filteredExpenses, previousMonthExpenses } = useMemo(() => {
+    if (!isClient) return { filteredExpenses: [], previousMonthExpenses: [] };
+
+    const currentMonthExpenses = expenses.filter(expense => {
       const expenseDate = parseISO(expense.date);
       return getMonth(expenseDate) === selectedMonth && getYear(expenseDate) === selectedYear;
     });
+
+    const previousMonthDate = subMonths(new Date(selectedYear, selectedMonth), 1);
+    const prevMonth = getMonth(previousMonthDate);
+    const prevYear = getYear(previousMonthDate);
+
+    const prevMonthExpenses = expenses.filter(expense => {
+        const expenseDate = parseISO(expense.date);
+        return getMonth(expenseDate) === prevMonth && getYear(expenseDate) === prevYear;
+    });
+
+    return { filteredExpenses: currentMonthExpenses, previousMonthExpenses: prevMonthExpenses };
   }, [expenses, selectedMonth, selectedYear, isClient]);
 
   const totalMonthlyExpenses = useMemo(() => {
     return filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
   }, [filteredExpenses]);
+
+  const totalPreviousMonthExpenses = useMemo(() => {
+    return previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+  }, [previousMonthExpenses]);
 
 
   const yearOptions = useMemo(() => {
@@ -154,34 +171,30 @@ export default function ExpenseEntryPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
-      <Card className="shadow-xl">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <WalletCards className="h-7 w-7 text-primary" />
-            <div>
-              <CardTitle className="font-headline text-2xl">Resumen de Gastos del Mes</CardTitle>
-              <CardDescription>
-                {new Date(selectedYear, selectedMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())}
-              </CardDescription>
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <StatCard
+            title="Total Gastado en el Mes"
+            value={formatCurrencyCOP(totalMonthlyExpenses)}
+            description={new Date(selectedYear, selectedMonth).toLocaleString('es-ES', { month: 'long', year: 'numeric' }).replace(/^\w/, (c) => c.toUpperCase())}
+            icon={TrendingDown}
+            valueClassName="text-destructive"
+            comparisonValue={totalPreviousMonthExpenses > 0 ? totalPreviousMonthExpenses : undefined}
+          />
+        <Card className="shadow-xl">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <PieChart className="h-6 w-6 text-primary" />
+              <div>
+                <CardTitle className="font-headline text-xl">Distribución por Categoría</CardTitle>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex flex-col justify-center p-6 bg-muted/50 rounded-lg">
-            <h3 className="text-sm font-medium text-muted-foreground">Total Gastado en el Mes</h3>
-            <p className="text-4xl font-bold font-headline text-destructive">{formatCurrencyCOP(totalMonthlyExpenses)}</p>
-          </div>
-          <div className="flex flex-col p-6 bg-muted/50 rounded-lg">
-            <h3 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                <PieChart className="h-4 w-4" />
-                Distribución por Categoría
-            </h3>
-            <div className="h-32">
-                <ExpenseCategoryChart expenses={filteredExpenses} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="h-32">
+             <ExpenseCategoryChart expenses={filteredExpenses} />
+          </CardContent>
+        </Card>
+      </div>
+
 
       <ExpenseEntryForm 
         onSubmitSuccess={handleSubmitSuccess}
