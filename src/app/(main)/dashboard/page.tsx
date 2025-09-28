@@ -15,23 +15,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 import { useSettings } from '@/hooks/useSettings';
-import { Edit3, BrainCircuit, Languages, TrendingUp, TrendingDown, Scale, Users, PieChart, CheckCircle, AlertTriangle, Target, Sparkles, Wand2 } from 'lucide-react';
+import { Edit3, TrendingUp, TrendingDown, Scale, Users, PieChart, CheckCircle, AlertTriangle, Target } from 'lucide-react';
 import { TopPerformerCard } from '@/components/cards/TopPerformerCard';
-import { GROUPS, LOCATIONS, EXPENSE_CATEGORIES } from '@/lib/constants';
+import { GROUPS, LOCATIONS } from '@/lib/constants';
 import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
 import type { Expense } from '@/types';
-import { analyzePerformance, PerformanceAnalysisOutput } from '@/ai/flows/analyze-performance-flow';
-import { getHistoricalMonthlyDataString } from '@/lib/calculations';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 
 export default function DashboardPage() {
@@ -42,10 +30,6 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof getDailySummary> | null>(null);
 
-  const [analysis, setAnalysis] = useState<PerformanceAnalysisOutput | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  
   useEffect(() => {
     // Set initial date on client side to avoid hydration mismatch
     setSelectedDate(new Date());
@@ -130,45 +114,6 @@ export default function DashboardPage() {
     return { dailyRevenue, dailyExpenses, dailyNet, dailyGoal };
   }, [selectedDate, expenses, dailySummary, settings.weeklyGoal]);
 
-  const handleAnalyzePerformance = async () => {
-    if (!currentMonthData || !topPerformers.topGroup || !topPerformers.topLocation) return;
-    
-    setIsAnalyzing(true);
-    setAnalysis(null);
-    setAnalysisError(null);
-
-    try {
-        const categoryMap = new Map(EXPENSE_CATEGORIES.map(c => [c.id, c.name]));
-        const expenseCategoryTotals: { [key: string]: number } = {};
-        currentPeriodExpenses.forEach(expense => {
-            const categoryName = categoryMap.get(expense.categoryId) || 'Desconocida';
-            expenseCategoryTotals[categoryName] = (expenseCategoryTotals[categoryName] || 0) + expense.amount;
-        });
-
-        const analysisInput = {
-            periodLabel: currentMonthData.period,
-            totalRevenue: currentMonthData.totalRevenueInPeriod,
-            totalVariableExpenses: currentMonthData.totalVariableExpenses,
-            netProfit: currentMonthData.finalNetProfit,
-            netMemberShare: currentMonthData.netMemberShare,
-            topPerformingGroup: topPerformers.topGroup,
-            topPerformingLocation: topPerformers.topLocation,
-            expenseCategories: Object.entries(expenseCategoryTotals).map(([name, value]) => ({ name, value })),
-            historicalData: getHistoricalMonthlyDataString(entries, settings),
-        };
-        
-        const result = await analyzePerformance(analysisInput);
-        setAnalysis(result);
-
-    } catch (error) {
-        console.error("Error analyzing performance:", error);
-        setAnalysisError("Ocurrió un error al generar el análisis. Por favor, inténtalo de nuevo.");
-    } finally {
-        setIsAnalyzing(false);
-    }
-  };
-
-
   if (isLoading || selectedDate === undefined) {
     return (
       <div className="space-y-6">
@@ -192,10 +137,6 @@ export default function DashboardPage() {
             <p className="text-muted-foreground mt-1">Un resumen de la actividad reciente.</p>
         </div>
         <div className="flex items-center gap-2">
-            <Button onClick={handleAnalyzePerformance} disabled={isAnalyzing || !currentMonthData}>
-                {isAnalyzing ? <Wand2 className="mr-2 h-4 w-4 animate-pulse" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
-                {isAnalyzing ? 'Analizando...' : 'Analizar Rendimiento con IA'}
-            </Button>
             <DatePicker date={selectedDate} setDate={setSelectedDate} />
         </div>
       </div>
@@ -323,60 +264,6 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-      
-       <AlertDialog open={isAnalyzing || !!analysis || !!analysisError} onOpenChange={(open) => { if (!open) { setIsAnalyzing(false); setAnalysis(null); setAnalysisError(null); }}}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2">
-                        {isAnalyzing ? <Wand2 className="h-6 w-6 animate-pulse" /> : <Sparkles className="h-6 w-6 text-primary" />}
-                        {isAnalyzing ? 'Generando Análisis...' : (analysis?.title || 'Análisis de Rendimiento')}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                       {isAnalyzing ? 'La IA está procesando los datos del período. Esto puede tardar unos segundos.' : (analysis?.summary || '')}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                {isAnalyzing && (
-                    <div className="space-y-4 my-4">
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-5/6" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-4/6" />
-                    </div>
-                )}
-                {analysis && (
-                    <div className="space-y-4 my-4 text-sm">
-                        <div>
-                            <h3 className="font-semibold text-green-500 mb-2 flex items-center gap-2"><CheckCircle className="h-5 w-5"/>Puntos Positivos</h3>
-                            <ul className="list-disc pl-6 space-y-1 text-foreground/90">
-                                {analysis.positivePoints.map((point, i) => <li key={i}>{point}</li>)}
-                            </ul>
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-amber-500 mb-2 flex items-center gap-2"><AlertTriangle className="h-5 w-5"/>Áreas de Mejora</h3>
-                            <ul className="list-disc pl-6 space-y-1 text-foreground/90">
-                                {analysis.areasForImprovement.map((point, i) => <li key={i}>{point}</li>)}
-                            </ul>
-                        </div>
-                         <div>
-                            <h3 className="font-semibold text-sky-500 mb-2 flex items-center gap-2"><Target className="h-5 w-5"/>Recomendación Principal</h3>
-                            <p className="text-foreground/90 pl-1">{analysis.recommendation}</p>
-                        </div>
-                    </div>
-                )}
-                {analysisError && (
-                     <div className="my-4 text-center text-destructive flex flex-col items-center gap-2">
-                        <AlertTriangle className="h-8 w-8" />
-                        <p>{analysisError}</p>
-                    </div>
-                )}
-                <AlertDialogFooter>
-                    <AlertDialogAction onClick={() => { setIsAnalyzing(false); setAnalysis(null); setAnalysisError(null); }}>Cerrar</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-
     </div>
   );
 }
-
-    
