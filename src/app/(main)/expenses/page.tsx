@@ -26,15 +26,17 @@ export default function ExpenseEntryPage() {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isClient, setIsClient] = useState(false);
 
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
   useEffect(() => {
     setIsClient(true);
+    // Set initial date on client side to avoid hydration mismatch
+    const today = new Date();
+    setSelectedMonth(today.getMonth());
+    setSelectedYear(today.getFullYear());
   }, []);
   
-  const currentMonth = new Date().getMonth();
-  const currentYear = new Date().getFullYear();
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-
   const tableContainerRef = useRef<HTMLDivElement>(null);
 
   const handleSubmitSuccess = () => {
@@ -89,6 +91,7 @@ export default function ExpenseEntryPage() {
 
 
   const yearOptions = useMemo(() => {
+    const currentYear = new Date().getFullYear();
     if (!isClient || expenses.length === 0) return [currentYear];
     // Ensure we handle the case where expenses might be empty initially
     const sortedExpenses = [...expenses].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -99,7 +102,7 @@ export default function ExpenseEntryPage() {
       years.push(y);
     }
     return years;
-  }, [expenses, currentYear, isClient]);
+  }, [expenses, isClient]);
 
   const handleExportCSV = () => {
     const categoryMap = new Map(EXPENSE_CATEGORIES.map(c => [c.id, c.name]));

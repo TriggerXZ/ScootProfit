@@ -267,16 +267,6 @@ export default function DashboardPage() {
         </div>
       </div>
       
-      <div className="mt-8 text-center flex gap-4 justify-center">
-        <Link href="/entry" passHref>
-          <Button size="lg" variant="secondary">
-            <Edit3 className="mr-2 h-5 w-5" /> Registrar Nuevos Ingresos
-          </Button>
-        </Link>
-      </div>
-
     </div>
   );
 }
-
-    
