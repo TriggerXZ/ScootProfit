@@ -15,7 +15,7 @@ import type { LocationRevenueInput, RevenueEntry } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Coins, Sigma, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Coins, Sigma, ArrowUpCircle, ArrowDownCircle, AlertTriangle } from 'lucide-react';
 import { formatCurrencyCOP } from '@/lib/formatters';
 
 const revenueSchema = z.string().refine(val => !isNaN(parseFloat(val.replace(/\./g, ''))) && parseFloat(val.replace(/\./g, '')) >= 0, {
@@ -54,6 +54,7 @@ const parseInputValue = (value: string): string => {
 export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEntry, onCancelEdit, averageDailyRevenue }: RevenueEntryFormProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [clientToday, setClientToday] = useState<Date | undefined>(undefined);
+  const [isExisting, setIsExisting] = useState(false);
   const { toast } = useToast();
 
   const { control, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<RevenueFormValues>({
@@ -86,39 +87,46 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
     setClientToday(today);
     if (!editingEntry) {
         setSelectedDate(today);
+        setValue("date", today);
     }
-  }, [editingEntry]);
+  }, []); // Run only on mount
   
   useEffect(() => {
     if (editingEntry) {
       const entryDate = parseISO(editingEntry.date);
       setSelectedDate(entryDate);
-      setValue("date", entryDate);
+      setValue("date", entryDate, { shouldValidate: true });
       LOCATION_IDS.forEach(locId => {
         setValue(locId, formatInputValue(editingEntry.revenues[locId]));
       });
+      setIsExisting(true);
     } else {
-        // When not editing, set to today and reset fields
+        // When not editing, reset to a clean state for the selected date
         const today = new Date();
         setSelectedDate(today);
-        setValue("date", today);
-        LOCATION_IDS.forEach(locId => setValue(locId, "0"));
+        reset({
+            date: today,
+            la72: "0", elCubo: "0", parqueDeLasLuces: "0", la78: "0",
+        });
+        setIsExisting(false);
     }
-  }, [editingEntry, setValue]);
+  }, [editingEntry, setValue, reset]);
 
   useEffect(() => {
     if (selectedDate && !editingEntry) {
-      setValue("date", selectedDate);
+      setValue("date", selectedDate, { shouldValidate: true });
       const dateString = format(selectedDate, 'yyyy-MM-dd');
-      const existingEntry = getExistingEntry(dateString);
-      if (existingEntry) {
+      const existingEntryForDate = getExistingEntry(dateString);
+      if (existingEntryForDate) {
         LOCATION_IDS.forEach(locId => {
-          setValue(locId, formatInputValue(existingEntry.revenues[locId]));
+          setValue(locId, formatInputValue(existingEntryForDate.revenues[locId]));
         });
+        setIsExisting(true);
       } else {
         LOCATION_IDS.forEach(locId => {
           setValue(locId, "0");
         });
+        setIsExisting(false);
       }
     }
   }, [selectedDate, getExistingEntry, setValue, editingEntry]);
@@ -133,28 +141,25 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
       la78: parseInputValue(data.la78),
     };
     
-    const isEditing = !!editingEntry;
+    const isUpdating = !!editingEntry || isExisting;
     
     onSubmitSuccess(dateString, revenues);
 
     toast({
-      title: isEditing ? "Ingreso Actualizado" : "Ingreso Guardado",
+      title: isUpdating ? "Ingreso Actualizado" : "Ingreso Guardado",
       description: `Los ingresos para ${format(data.date, 'PPP', { locale: es })} han sido guardados.`,
     });
     
-    if (isEditing) {
-        onCancelEdit(); // This will clear the editing state
+    if (editingEntry) {
+        onCancelEdit(); // This will clear the editing state from parent
     } else {
-        // Not editing, reset form and advance date
+        // Not in explicit edit mode, so reset form and advance date
         const nextDay = addDays(data.date, 1);
-        setSelectedDate(nextDay);
-        reset({
-            date: nextDay,
-            la72: "0",
-            elCubo: "0",
-            parqueDeLasLuces: "0",
-            la78: "0",
-        });
+        if (clientToday && nextDay <= clientToday) {
+            setSelectedDate(nextDay);
+        } else {
+            setSelectedDate(clientToday);
+        }
     }
   };
 
@@ -175,13 +180,13 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
                 <DatePicker
                   date={field.value}
                   setDate={(date) => {
-                    if (!editingEntry) { // Only allow date changes if not in edit mode
+                    if (!editingEntry) { // Only allow date changes if not in explicit edit mode
                         field.onChange(date);
                         setSelectedDate(date);
                     }
                   }}
                   disabled={(date) => {
-                    if (editingEntry) return true; // Disable calendar if editing
+                    if (editingEntry) return true; // Disable calendar if in explicit edit mode
                     if (!clientToday) return true;
                     return date > clientToday || date < new Date("2020-01-01");
                   }}
@@ -190,6 +195,13 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
             />
             {errors.date && <p className="text-sm text-destructive">{errors.date.message}</p>}
           </div>
+          
+          {isExisting && !editingEntry && (
+              <div className="flex items-start gap-3 p-3 text-sm text-amber-800 bg-amber-500/20 rounded-md border border-amber-500/40">
+                  <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0 text-amber-600" />
+                  <p><b>Atención:</b> Ya existen datos para esta fecha. Al guardar, se sobrescribirán los valores anteriores. Para editar un día específico sin cambiar la fecha, haz clic en el botón de editar en la tabla de historial.</p>
+              </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             {LOCATION_IDS.map(locId => (
@@ -249,7 +261,7 @@ export function RevenueEntryForm({ onSubmitSuccess, getExistingEntry, editingEnt
               </Button>
             )}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground text-lg py-6" disabled={isSubmitting}>
-                {isSubmitting ? "Guardando..." : (editingEntry ? 'Actualizar Ingreso' : 'Guardar Ingresos')}
+                {isSubmitting ? "Guardando..." : (editingEntry || isExisting ? 'Actualizar Ingreso' : 'Guardar Ingresos')}
             </Button>
         </CardFooter>
       </form>
