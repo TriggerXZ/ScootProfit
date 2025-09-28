@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Settings, AlertTriangle, Copy, ClipboardPaste } from 'lucide-react';
-import { LOCAL_STORAGE_SETTINGS_KEY, LOCAL_STORAGE_REVENUE_KEY, LOCAL_STORAGE_EXPENSES_KEY } from '@/lib/constants';
+import { Settings, AlertTriangle, Copy, ClipboardPaste, Target } from 'lucide-react';
+import { LOCAL_STORAGE_SETTINGS_KEY, LOCAL_STORAGE_REVENUE_KEY, LOCAL_STORAGE_EXPENSES_KEY, LOCATIONS } from '@/lib/constants';
 import { useSettings } from '@/hooks/useSettings';
 import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -19,14 +19,25 @@ import { Textarea } from '@/components/ui/textarea';
 
 const settingsSchema = z.object({
   numberOfMembers: z.number().int().min(1, "El número de miembros debe ser al menos 1."),
-  monthlyGoal: z.number().int().min(1, "La meta debe ser un número positivo."),
   weeklyGoal: z.number().int().min(1, "La meta debe ser un número positivo."),
   zonaSeguraDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
   arriendoDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
   cooperativaDeduction: z.number().int().nonnegative("El costo debe ser un número positivo."),
+  goal_la72: z.number().int().nonnegative("La meta debe ser un número positivo."),
+  goal_elCubo: z.number().int().nonnegative("La meta debe ser un número positivo."),
+  goal_parqueDeLasLuces: z.number().int().nonnegative("La meta debe ser un número positivo."),
+  goal_la78: z.number().int().nonnegative("La meta debe ser un número positivo."),
+}).refine(data => {
+    const totalGoal = data.goal_la72 + data.goal_elCubo + data.goal_parqueDeLasLuces + data.goal_la78;
+    return totalGoal > 0;
+}, {
+    message: "La suma de las metas por ubicación debe ser mayor que cero.",
+    path: ["goal_la72"], // You can associate the error with one of the fields
 });
 
-type SettingsFormValues = z.infer<typeof settingsSchema>;
+// We remove monthlyGoal from the form validation, it will be calculated
+type SettingsFormValues = Omit<z.infer<typeof settingsSchema>, 'monthlyGoal'>;
+
 
 export default function SettingsPage() {
   const { toast } = useToast();
@@ -46,7 +57,10 @@ export default function SettingsPage() {
   }, [settings, isLoading, reset]);
 
   const processSubmit = (data: SettingsFormValues) => {
-    localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(data));
+    const monthlyGoal = (data.goal_la72 || 0) + (data.goal_elCubo || 0) + (data.goal_parqueDeLasLuces || 0) + (data.goal_la78 || 0);
+    const settingsToSave = { ...data, monthlyGoal };
+
+    localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsToSave));
     refreshSettings(); // Refresh the settings in the hook
     toast({
       title: "Configuración Guardada",
@@ -134,74 +148,81 @@ export default function SettingsPage() {
         </CardHeader>
         <form onSubmit={handleSubmit(processSubmit)}>
           <CardContent className="space-y-8">
-            <div className="space-y-2">
-              <Label htmlFor="numberOfMembers">Número de Miembros</Label>
-              <Controller
-                name="numberOfMembers"
-                control={control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    id="numberOfMembers"
-                    type="number"
-                    placeholder="Escribe el número total de miembros"
-                    onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
-                    className="text-lg"
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="numberOfMembers">Número de Miembros</Label>
+                  <Controller
+                    name="numberOfMembers"
+                    control={control}
+                    render={({ field }) => (
+                      <Input
+                        {...field}
+                        id="numberOfMembers"
+                        type="number"
+                        placeholder="Escribe el número total de miembros"
+                        onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
+                        className="text-lg"
+                      />
+                    )}
                   />
-                )}
-              />
-              {errors.numberOfMembers && <p className="text-sm text-destructive">{errors.numberOfMembers.message}</p>}
-              <p className="text-xs text-muted-foreground mt-1">
-                Este valor se usa para calcular la cuota por miembro.
-              </p>
+                  {errors.numberOfMembers && <p className="text-sm text-destructive">{errors.numberOfMembers.message}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Este valor se usa para calcular la cuota por miembro.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="weeklyGoal">Meta de Ingresos Semanal</Label>
+                     <Controller
+                      name="weeklyGoal"
+                      control={control}
+                      render={({ field }) => (
+                        <Input
+                          id="weeklyGoal"
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="Escribe la meta semanal"
+                          value={parseInt(String(field.value), 10).toLocaleString('es-CO')}
+                          onChange={(e) => field.onChange(parseInt(e.target.value.replace(/\./g, ''), 10) || 0)}
+                          className="text-lg"
+                        />
+                      )}
+                    />
+                    {errors.weeklyGoal && <p className="text-sm text-destructive">{errors.weeklyGoal.message}</p>}
+                     <p className="text-xs text-muted-foreground mt-1">
+                      Usada para el cumplimiento diario en el Dashboard.
+                    </p>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="weeklyGoal">Meta de Ingresos Semanal</Label>
-                 <Controller
-                  name="weeklyGoal"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      id="weeklyGoal"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Escribe la meta semanal"
-                      value={parseInt(String(field.value), 10).toLocaleString('es-CO')}
-                      onChange={(e) => field.onChange(parseInt(e.target.value.replace(/\./g, ''), 10) || 0)}
-                      className="text-lg"
-                    />
-                  )}
-                />
-                {errors.weeklyGoal && <p className="text-sm text-destructive">{errors.weeklyGoal.message}</p>}
-                 <p className="text-xs text-muted-foreground mt-1">
-                  Esta meta se usa para calcular el cumplimiento diario en el Dashboard.
-                </p>
+            <div>
+              <h3 className="text-lg font-medium font-headline mb-4 flex items-center gap-2"><Target className="h-5 w-5" /> Metas de Ingresos por Ubicación (28 días)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {Object.values(LOCATIONS).map(location => (
+                    <div className="space-y-2" key={location.id}>
+                        <Label htmlFor={`goal_${location.id}`}>{location.name}</Label>
+                        <Controller
+                            name={`goal_${location.id}` as keyof SettingsFormValues}
+                            control={control}
+                            render={({ field }) => (
+                            <Input
+                                id={`goal_${location.id}`}
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="Escribe la meta"
+                                value={parseInt(String(field.value), 10).toLocaleString('es-CO')}
+                                onChange={(e) => field.onChange(parseInt(e.target.value.replace(/\./g, ''), 10) || 0)}
+                                className="text-lg"
+                            />
+                            )}
+                        />
+                        {errors[`goal_${location.id}` as keyof typeof errors] && <p className="text-sm text-destructive">{errors[`goal_${location.id}` as keyof typeof errors]?.message}</p>}
+                    </div>
+                ))}
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="monthlyGoal">Meta de Ingresos (Período de 28 días)</Label>
-                 <Controller
-                  name="monthlyGoal"
-                  control={control}
-                  render={({ field }) => (
-                    <Input
-                      id="monthlyGoal"
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="Escribe la meta de ingresos"
-                      value={parseInt(String(field.value), 10).toLocaleString('es-CO')}
-                      onChange={(e) => field.onChange(parseInt(e.target.value.replace(/\./g, ''), 10) || 0)}
-                      className="text-lg"
-                    />
-                  )}
-                />
-                {errors.monthlyGoal && <p className="text-sm text-destructive">{errors.monthlyGoal.message}</p>}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Esta meta se usa en la tarjeta de progreso del Dashboard y en los reportes.
+                {errors.goal_la72?.message && <p className="text-sm text-destructive mt-2">{errors.goal_la72.message}</p>}
+                 <p className="text-xs text-muted-foreground mt-2">
+                  La meta de ingresos total para el período de 28 días será la suma de estas metas individuales.
                 </p>
-              </div>
             </div>
             
             <div>

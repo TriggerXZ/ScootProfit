@@ -19,6 +19,10 @@ export interface AppSettings {
   zonaSeguraDeduction: number;
   arriendoDeduction: number;
   cooperativaDeduction: number;
+  goal_la72: number;
+  goal_elCubo: number;
+  goal_parqueDeLasLuces: number;
+  goal_la78: number;
 }
 
 const defaultSettings: AppSettings = {
@@ -28,6 +32,10 @@ const defaultSettings: AppSettings = {
   zonaSeguraDeduction: DEFAULT_DEDUCTION_ZONA_SEGURA_PER_MEMBER,
   arriendoDeduction: DEFAULT_DEDUCTION_ARRIENDO_PER_MEMBER,
   cooperativaDeduction: DEFAULT_DEDUCTION_APORTE_COOPERATIVA_PER_MEMBER,
+  goal_la72: 0,
+  goal_elCubo: 0,
+  goal_parqueDeLasLuces: 0,
+  goal_la78: 0,
 };
 
 function getSettingsFromLocalStorage(): AppSettings {
@@ -39,7 +47,20 @@ function getSettingsFromLocalStorage(): AppSettings {
         if (storedSettings) {
             const parsed = JSON.parse(storedSettings);
             // Merge stored settings with defaults to ensure all keys are present
-            return { ...defaultSettings, ...parsed };
+            const updatedSettings = { ...defaultSettings, ...parsed };
+
+            // Recalculate monthlyGoal based on individual location goals
+            const individualGoalsTotal = 
+                (updatedSettings.goal_la72 || 0) +
+                (updatedSettings.goal_elCubo || 0) +
+                (updatedSettings.goal_parqueDeLasLuces || 0) +
+                (updatedSettings.goal_la78 || 0);
+            
+            if (individualGoalsTotal > 0) {
+                updatedSettings.monthlyGoal = individualGoalsTotal;
+            }
+
+            return updatedSettings;
         }
     } catch (error) {
         console.error("Failed to parse settings from localStorage:", error);
@@ -74,5 +95,3 @@ export function useSettings() {
 
   return { settings, isLoading, refreshSettings };
 }
-
-    
