@@ -46,6 +46,10 @@ const prompt = ai.definePrompt({
     name: 'analyzePerformancePrompt',
     input: { schema: PerformanceAnalysisInputSchema },
     output: { schema: PerformanceAnalysisOutputSchema },
+    model: 'googleai/gemini-1.5-flash-latest',
+    config: {
+        temperature: 0.3,
+    },
     prompt: `
         Eres un asesor financiero experto para un negocio de alquiler de scooters. Tu tarea es analizar el rendimiento del período y presentar un informe claro, conciso y accionable en español.
 
@@ -95,5 +99,3 @@ const analyzePerformanceFlow = ai.defineFlow(
 export async function analyzePerformance(input: PerformanceAnalysisInput): Promise<PerformanceAnalysisOutput> {
     return analyzePerformanceFlow(input);
 }
-
-    
