@@ -46,7 +46,7 @@ const prompt = ai.definePrompt({
     name: 'analyzePerformancePrompt',
     input: { schema: PerformanceAnalysisInputSchema },
     output: { schema: PerformanceAnalysisOutputSchema },
-    model: 'googleai/gemini-1.5-flash',
+    model: 'googleai/gemini-pro',
     config: {
         temperature: 0.3,
     },
