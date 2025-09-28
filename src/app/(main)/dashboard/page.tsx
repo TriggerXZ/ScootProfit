@@ -193,7 +193,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
             <Button onClick={handleAnalyzePerformance} disabled={isAnalyzing || !currentMonthData}>
-                <BrainCircuit className="mr-2 h-4 w-4" />
+                {isAnalyzing ? <Wand2 className="mr-2 h-4 w-4 animate-pulse" /> : <BrainCircuit className="mr-2 h-4 w-4" />}
                 {isAnalyzing ? 'Analizando...' : 'Analizar Rendimiento con IA'}
             </Button>
             <DatePicker date={selectedDate} setDate={setSelectedDate} />
@@ -346,25 +346,26 @@ export default function DashboardPage() {
                 {analysis && (
                     <div className="space-y-4 my-4 text-sm">
                         <div>
-                            <h3 className="font-semibold text-green-500 mb-2">Puntos Positivos</h3>
-                            <ul className="list-disc pl-5 space-y-1 text-foreground/90">
+                            <h3 className="font-semibold text-green-500 mb-2 flex items-center gap-2"><CheckCircle className="h-5 w-5"/>Puntos Positivos</h3>
+                            <ul className="list-disc pl-6 space-y-1 text-foreground/90">
                                 {analysis.positivePoints.map((point, i) => <li key={i}>{point}</li>)}
                             </ul>
                         </div>
                         <div>
-                            <h3 className="font-semibold text-amber-500 mb-2">Áreas de Mejora</h3>
-                            <ul className="list-disc pl-5 space-y-1 text-foreground/90">
+                            <h3 className="font-semibold text-amber-500 mb-2 flex items-center gap-2"><AlertTriangle className="h-5 w-5"/>Áreas de Mejora</h3>
+                            <ul className="list-disc pl-6 space-y-1 text-foreground/90">
                                 {analysis.areasForImprovement.map((point, i) => <li key={i}>{point}</li>)}
                             </ul>
                         </div>
                          <div>
-                            <h3 className="font-semibold text-sky-500 mb-2">Recomendación Principal</h3>
-                            <p className="text-foreground/90">{analysis.recommendation}</p>
+                            <h3 className="font-semibold text-sky-500 mb-2 flex items-center gap-2"><Target className="h-5 w-5"/>Recomendación Principal</h3>
+                            <p className="text-foreground/90 pl-1">{analysis.recommendation}</p>
                         </div>
                     </div>
                 )}
                 {analysisError && (
-                     <div className="my-4 text-center text-destructive">
+                     <div className="my-4 text-center text-destructive flex flex-col items-center gap-2">
+                        <AlertTriangle className="h-8 w-8" />
                         <p>{analysisError}</p>
                     </div>
                 )}
@@ -377,3 +378,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

@@ -63,17 +63,17 @@ const prompt = ai.definePrompt({
         {{/each}}
         
         {{#if historicalData}}
-        Datos históricos de ingresos para contexto de tendencia: {{historicalData}}
+        Datos históricos de ingresos para contexto de tendencia (Formato Mes:Total): {{historicalData}}
         {{/if}}
 
         Basado en estos datos, genera el siguiente análisis:
         1.  **Título:** Un título corto y potente que resuma el período.
-        2.  **Resumen:** Una o dos frases que describan la salud financiera general. Menciona si fue un buen o mal período.
-        3.  **Puntos Positivos:** Identifica 2-3 éxitos claros. ¿Qué funcionó bien? ¿Qué grupo o ubicación destacó?
-        4.  **Áreas de Mejora:** Identifica 2-3 riesgos o problemas. ¿Qué gastos son preocupantes? ¿Hay alguna tendencia negativa?
-        5.  **Recomendación:** Ofrece una sugerencia principal y concreta. ¿Qué debería hacer el negocio a continuación?
+        2.  **Resumen:** Una o dos frases que describan la salud financiera general. Menciona si fue un buen o mal período, considerando los datos históricos si están disponibles.
+        3.  **Puntos Positivos:** Identifica 2-3 éxitos claros. ¿Qué funcionó bien? ¿Qué grupo o ubicación destacó? Compara con tendencias si es relevante.
+        4.  **Áreas de Mejora:** Identifica 2-3 riesgos o problemas. ¿Qué gastos son preocupantes? ¿Hay alguna tendencia negativa en los ingresos?
+        5.  **Recomendación:** Ofrece una sugerencia principal y concreta basada en todo el análisis. ¿Qué debería hacer el negocio a continuación para mejorar los resultados?
 
-        Sé directo, usa un lenguaje de negocios pero fácil de entender. No repitas los números exactos a menos que sea para enfatizar un punto crítico. Enfócate en las conclusiones.
+        Sé directo, usa un lenguaje de negocios pero fácil de entender. No repitas los números exactos a menos que sea para enfatizar un punto crítico. Enfócate en las conclusiones e insights derivados de los datos.
     `,
 });
 
@@ -95,3 +95,5 @@ const analyzePerformanceFlow = ai.defineFlow(
 export async function analyzePerformance(input: PerformanceAnalysisInput): Promise<PerformanceAnalysisOutput> {
     return analyzePerformanceFlow(input);
 }
+
+    
