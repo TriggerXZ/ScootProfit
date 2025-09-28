@@ -233,7 +233,7 @@ export function getAllTimeTotal(entries: RevenueEntry[], expenses: Expense[], se
 
 
 export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings: AppSettings): string {
-  const monthlyTotals = get28DayTotals(entries, [], settings); 
+  const monthlyTotals = getCalendarMonthlyTotals(entries, [], settings); 
   
   const sortedMonthlyTotals = [...monthlyTotals].sort((a, b) => {
     const dateA = a.entries.length > 0 ? parseISO(a.entries[0].date) : new Date(0);
@@ -245,5 +245,3 @@ export function getHistoricalMonthlyDataString(entries: RevenueEntry[], settings
     .map(monthly => `${monthly.period}:${Math.round(monthly.totalRevenueInPeriod)}`)
     .join(',');
 }
-
-    
