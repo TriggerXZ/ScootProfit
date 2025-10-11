@@ -15,20 +15,30 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { WeeklyRevenueChart } from '@/components/charts/WeeklyRevenueChart';
 import { useSettings } from '@/hooks/useSettings';
-import { Edit3, TrendingUp, TrendingDown, Scale, Users, PieChart, CheckCircle, AlertTriangle, Target } from 'lucide-react';
+import { Edit3, TrendingUp, TrendingDown, Scale, Users, PieChart, CheckCircle, AlertTriangle, Target, BrainCircuit, Wand2 } from 'lucide-react';
 import { TopPerformerCard } from '@/components/cards/TopPerformerCard';
 import { GROUPS, LOCATIONS } from '@/lib/constants';
 import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
 import type { Expense } from '@/types';
+import { analyzePerformance } from '@/ai/flows/analyze-performance-flow';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction } from '@/components/ui/alert-dialog';
+import type { z } from 'zod';
+import { getHistoricalMonthlyDataString } from '@/lib/calculations';
 
+type AnalysisResult = z.infer<Awaited<ReturnType<typeof analyzePerformance>>>;
 
 export default function DashboardPage() {
-  const { entries, isLoading: isLoadingRevenues, all28DayTotals, getDailySummary, refreshEntries } = useRevenueEntries();
+  const { entries, isLoading: isLoadingRevenues, all28DayTotals, getDailySummary, refreshEntries, allCalendarMonthlyTotals } = useRevenueEntries();
   const { expenses, isLoading: isLoadingExpenses } = useExpenses();
   const { settings, isLoading: isLoadingSettings } = useSettings();
   
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [dailySummary, setDailySummary] = useState<ReturnType<typeof getDailySummary> | null>(null);
+
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
 
   useEffect(() => {
     // Set initial date on client side to avoid hydration mismatch
@@ -114,6 +124,29 @@ export default function DashboardPage() {
     return { dailyRevenue, dailyExpenses, dailyNet, dailyGoal };
   }, [selectedDate, expenses, dailySummary, settings.weeklyGoal]);
 
+  const handleAnalyzePerformance = async () => {
+    if (!currentMonthData) return;
+    setIsAnalyzing(true);
+    setAnalysis(null);
+    setAnalysisError(null);
+
+    try {
+        const historicalData = getHistoricalMonthlyDataString(entries, settings);
+        const result = await analyzePerformance(currentMonthData, historicalData);
+        setAnalysis(result);
+    } catch (error: any) {
+        console.error("Error analyzing performance:", error);
+        setAnalysisError(error.message || "An unknown error occurred during analysis.");
+    } finally {
+        setIsAnalyzing(false);
+    }
+  };
+
+  const closeAnalysisDialog = () => {
+    setAnalysis(null);
+    setAnalysisError(null);
+  }
+
   if (isLoading || selectedDate === undefined) {
     return (
       <div className="space-y-6">
@@ -138,8 +171,78 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-2">
             <DatePicker date={selectedDate} setDate={setSelectedDate} />
+             <Button onClick={handleAnalyzePerformance} disabled={isAnalyzing || !currentMonthData} variant="outline" className="bg-primary/10 border-primary/30 hover:bg-primary/20 text-primary">
+                {isAnalyzing ? (
+                  <>
+                    <Wand2 className="mr-2 h-5 w-5 animate-pulse" />
+                    Analizando...
+                  </>
+                ) : (
+                  <>
+                    <BrainCircuit className="mr-2 h-5 w-5" />
+                    Analizar Rendimiento con IA
+                  </>
+                )}
+            </Button>
         </div>
       </div>
+
+       <AlertDialog open={!!analysis || !!analysisError || isAnalyzing} onOpenChange={closeAnalysisDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    {isAnalyzing ? (
+                         <div className="flex flex-col items-center justify-center space-y-4 p-8">
+                            <Wand2 className="h-12 w-12 text-primary animate-pulse" />
+                            <AlertDialogTitle>Analizando el rendimiento...</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                La IA está procesando los datos del período. Por favor, espera un momento.
+                            </AlertDialogDescription>
+                            <div className="w-full space-y-4 pt-4">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-5/6" />
+                            </div>
+                        </div>
+                    ) : analysisError ? (
+                        <>
+                            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+                                <AlertTriangle /> Error en el Análisis
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Hubo un problema al generar el análisis de IA.
+                                <pre className="mt-4 p-2 bg-muted rounded-md text-xs whitespace-pre-wrap">{analysisError}</pre>
+                            </AlertDialogDescription>
+                        </>
+                    ) : analysis ? (
+                       <>
+                        <AlertDialogTitle className="font-headline text-2xl text-primary">{analysis.title}</AlertDialogTitle>
+                        <AlertDialogDescription>{analysis.summary}</AlertDialogDescription>
+                        <div className="pt-4 space-y-4">
+                            <div>
+                                <h3 className="font-semibold text-lg text-green-500 flex items-center gap-2 mb-2"><CheckCircle /> Puntos Positivos</h3>
+                                <ul className="list-disc pl-5 space-y-1 text-sm text-foreground">
+                                    {analysis.positivePoints.map((point, i) => <li key={i}>{point}</li>)}
+                                </ul>
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg text-amber-500 flex items-center gap-2 mb-2"><AlertTriangle /> Áreas de Mejora</h3>
+                                <ul className="list-disc pl-5 space-y-1 text-sm text-foreground">
+                                    {analysis.areasForImprovement.map((point, i) => <li key={i}>{point}</li>)}
+                                </ul>
+                            </div>
+                            <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                                <h3 className="font-semibold text-lg text-blue-500 flex items-center gap-2 mb-2"><Target /> Recomendación Principal</h3>
+                                <p className="text-sm text-blue-900 dark:text-blue-200">{analysis.recommendation}</p>
+                            </div>
+                        </div>
+                       </>
+                    ) : null}
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogAction onClick={closeAnalysisDialog}>Cerrar</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard 

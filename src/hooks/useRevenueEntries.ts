@@ -15,6 +15,7 @@ import {
   get28DayTotals,
   getCalendarMonthlyTotals,
   getAllTimeTotal,
+  getHistoricalMonthlyDataString,
 } from '@/lib/calculations';
 import { LOCATION_IDS, LocationId } from '@/lib/constants';
 import { format } from 'date-fns';
@@ -103,5 +104,3 @@ export function useRevenueEntries() {
     refreshEntries,
   };
 }
-
-    
