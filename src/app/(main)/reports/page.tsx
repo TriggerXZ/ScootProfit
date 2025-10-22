@@ -10,7 +10,7 @@ import { useRevenueEntries } from '@/hooks/useRevenueEntries';
 import { useExpenses } from '@/hooks/useExpenses';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { FileText, BarChart2, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { FileText, BarChart2 } from 'lucide-react';
 import type { AggregatedTotal, RevenueEntry, Expense } from '@/types';
 import { format, getMonth, getYear, parseISO, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getGroupForLocationOnDate } from '@/lib/calculations';
 import { formatCurrencyCOP } from '@/lib/formatters';
 import { ExpenseCategoryChart } from '@/components/charts/ExpenseCategoryChart';
+import { GROUPS } from '@/lib/constants';
 
 
 export default function ReportsPage() {
@@ -215,7 +216,7 @@ export default function ReportsPage() {
     };
     
     try {
-      await html2pdf().from(invoiceHTML).set(options).save();
+      await html2pdf().from(invoiceHTML).set(options).outputPdf('dataurlnewwindow');
     } catch (error) {
       console.error("Error generating invoice PDF:", error);
       alert("Hubo un error al generar la liquidación PDF. Por favor, inténtalo de nuevo.");
@@ -270,6 +271,16 @@ export default function ReportsPage() {
         const sign = change >= 0 ? '+' : '';
         return `<span style="font-size: 10pt; color: ${color};"> (${sign}${change.toFixed(1)}%)</span>`;
     };
+    
+    const groupRevenueRows = Object.entries(summaryData.groupRevenueTotals).map(([groupId, total]) => {
+        const groupName = GROUPS[groupId as keyof typeof GROUPS]?.name || groupId;
+        return `
+            <tr style="background-color: #fdfdfd;">
+                <td style="padding: 6px 8px; border: 1px solid #ddd;">&nbsp;&nbsp;&nbsp;&nbsp;Ingresos ${groupName}</td>
+                <td style="padding: 6px 8px; border: 1px solid #ddd; text-align: right;">${formatCurrencyCOP(total)}</td>
+            </tr>
+        `;
+    }).join('');
 
     const summaryHTML = `
       <div style="font-family: Arial, sans-serif; width: 100%; max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #eee; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-size: 10pt; line-height: 1.5; color: #333;">
@@ -289,6 +300,7 @@ export default function ReportsPage() {
                 ${getChangeIndicator(summaryData.totalRevenueInPeriod, previousPeriodData?.totalRevenueInPeriod)}
               </td>
             </tr>
+            ${groupRevenueRows}
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd;">Costos Fijos Totales</td>
               <td style="padding: 8px; border: 1px solid #ddd; text-align: right; color: #dc3545;">
@@ -358,7 +370,7 @@ export default function ReportsPage() {
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     };
 
-    html2pdf().from(summaryHTML).set(options).save();
+    html2pdf().from(summaryHTML).set(options).outputPdf('dataurlnewwindow');
   };
 
   return (
@@ -408,7 +420,7 @@ export default function ReportsPage() {
                 )}
                  <Button onClick={handleDownloadSummaryPDF} variant="outline" disabled={!summaryData || isLoading}>
                     <FileText className="mr-2 h-4 w-4" />
-                    Descargar Resumen
+                    Ver Resumen PDF
                 </Button>
             </div>
           </div>
@@ -475,8 +487,5 @@ export default function ReportsPage() {
     </div>
   );
 }
-
-
-
 
     

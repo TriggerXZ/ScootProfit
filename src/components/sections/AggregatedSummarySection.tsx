@@ -88,8 +88,8 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         </div>
                       )}
                       <div>
-                        <div className={`text-xl font-semibold flex items-center justify-end ${isGoalMet ? 'text-green-500' : 'text-red-500'}`}>
-                          {isGoalMet ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
+                        <div className={`text-xl font-semibold flex items-center justify-end ${item.finalNetProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                          {item.finalNetProfit >= 0 ? <TrendingUp className="mr-1 h-5 w-5" /> : <TrendingDown className="mr-1 h-5 w-5" />}
                           {formatCurrencyCOP(item.finalNetProfit)}
                         </div>
                         <div className="text-xs text-muted-foreground">Beneficio Neto del Periodo</div>
@@ -189,7 +189,7 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
                         className="mt-4"
                       >
                         <FileText className="mr-2 h-4 w-4" />
-                        Descargar Liquidación PDF
+                        Ver Liquidación PDF
                       </Button>
                   </div>
 
@@ -202,3 +202,5 @@ export function AggregatedSummarySection({ title, totals, isLoading, onDownloadI
     </Card>
   );
 }
+
+    
